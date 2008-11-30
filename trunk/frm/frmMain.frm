@@ -1,5 +1,5 @@
 VERSION 5.00
-Object = "{831FDD16-0C5C-11D2-A9FC-0000F8754DA1}#2.0#0"; "mscomctl.ocx"
+Object = "{831FDD16-0C5C-11D2-A9FC-0000F8754DA1}#2.0#0"; "MSCOMCTL.OCX"
 Begin VB.Form frmMain 
    Caption         =   "Pop-Client"
    ClientHeight    =   4050
@@ -10,6 +10,22 @@ Begin VB.Form frmMain
    ScaleHeight     =   4050
    ScaleWidth      =   7935
    StartUpPosition =   3  'Windows-Standard
+   Begin VB.CommandButton Command1 
+      Caption         =   "Command1"
+      Height          =   375
+      Left            =   6000
+      TabIndex        =   3
+      Top             =   3360
+      Width           =   1695
+   End
+   Begin VB.TextBox Text1 
+      Height          =   375
+      Left            =   1320
+      TabIndex        =   1
+      Text            =   "Text1"
+      Top             =   3000
+      Width           =   4575
+   End
    Begin MSComctlLib.ListView lsvTestView 
       Height          =   2535
       Left            =   1320
@@ -28,6 +44,14 @@ Begin VB.Form frmMain
       BorderStyle     =   1
       Appearance      =   1
       NumItems        =   0
+   End
+   Begin VB.Label Label1 
+      Caption         =   "Label1"
+      Height          =   255
+      Left            =   1320
+      TabIndex        =   2
+      Top             =   3480
+      Width           =   4455
    End
 End
 Attribute VB_Name = "frmMain"
@@ -56,17 +80,17 @@ End Sub
 Private Sub lsvTestView_ColumnClick(ByVal ColumnHeader As MSComctlLib.ColumnHeader)
     Static blnDescending(2) As Boolean
 
-    If ColumnHeader.Index = 1 Then 'there it starts with 1!
+    If ColumnHeader.index = 1 Then 'there it starts with 1!
         'MsgBox "first one"
-    ElseIf ColumnHeader.Index = 2 Then
+    ElseIf ColumnHeader.index = 2 Then
         'MsgBox "second one"
     End If
     
     With lsvTestView
-        .SortKey = ColumnHeader.Index - 1 'there it starts with 0!
-        .SortOrder = Switch(blnDescending(ColumnHeader.Index - 1), lvwDescending, True, lvwAscending)
+        .SortKey = ColumnHeader.index - 1 'there it starts with 0!
+        .SortOrder = Switch(blnDescending(ColumnHeader.index - 1), lvwDescending, True, lvwAscending)
         .Sorted = True
-        blnDescending(ColumnHeader.Index - 1) = Not blnDescending(ColumnHeader.Index - 1)
+        blnDescending(ColumnHeader.index - 1) = Not blnDescending(ColumnHeader.index - 1)
     End With
     
     

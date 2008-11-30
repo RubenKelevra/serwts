@@ -1,0 +1,220 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+  Persistable = 0  'NotPersistable
+  DataBindingBehavior = 0  'vbNone
+  DataSourceBehavior  = 0  'vbNone
+  MTSTransactionMode  = 0  'NotAnMTSObject
+END
+Attribute VB_Name = "clsAccount"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = True
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = False
+Option Explicit
+
+Private Declare Function createDir _
+ Lib "imagehlp.dll" (ByVal lpPath As String) As Long
+
+
+Private Const ConfHeaderLines = 2
+Private Const ConfBodyLines = 7
+
+Private mPath As String     'Our configuration directory which holds all
+                            'encrypted configuration files
+Private mUser As String     'The given username - if it's set we had logged in
+Private mPass As String     'The password which can be used to open the
+                            'config-file of the user (not plaintext -
+                            'SHA-256 checksummed with username as SHA-256 as salt
+Private mFile As String     'The encrypted file's filename which is the MD5 sum
+                            'of the SHA-256 sum of mUser
+Private mBakFile As String  'The backup file's filename which is the same filename
+                            'as mFile but with .bak extention
+Public LastLoginTime As Date
+Private mUserChkSum As String
+
+Private mSHA256 As xclsSHA256
+Private mBlowfish As xclsBlowfish
+Private mHuffman As xclsHuffman
+Private mMD5 As xclsMD5
+
+Private Sub Class_Initialize()
+    'Private Class_Initialize
+    'space to run some functions to initialize some (default)values
+    
+    'fill path to our application data folder
+    mPath = GetSpecialFolder(CSIDL_APPDATA, True, True) + BackSlash + "Serwts Mailclient" + BackSlash
+    
+    'creating folder if it isn't existing
+    If Not (CBool(createDir(mPath))) Then
+        Call Err.Raise(vbObjectError, , "Application directory couldn't be created, check filesystem rights")
+    End If
+    
+    Set mSHA256 = New xclsSHA256
+    Set mBlowfish = New xclsBlowfish
+    Set mHuffman = New xclsHuffman
+    Set mMD5 = New xclsMD5
+End Sub
+
+Private Sub SetFilenames(ByRef User As String)
+    'Private setFilename
+    'calcs the local var for the filenames
+    ' - [IN] ByRef User As String: The username which is used to login
+    mFile = mMD5.sum(mSHA256.sum(User))
+    mBakFile = mFile & ".bak"
+    mFile = mFile & ".acc"
+End Sub
+
+Private Sub SetPassword(ByRef UserSHA256 As String, ByRef Pass As String)
+    'Private setPassword
+    'calcs the password out of username and given password which is actual used
+    'while decrypting and encrypting via blowfish
+    ' - [IN] ByRef User As String: The login name of the user
+    ' - [IN] ByRef Pass As String: The given password for this user
+    mPass = mSHA256.sum(Pass & UserSHA256)
+End Sub
+Private Sub SetUserSHA256(ByRef User As String)
+    'Private Sub SetUserSHA256
+    'calcs the SHA256 sum of the given user and setting the var
+    ' - [IN] ByRef User As String: The login name of the user
+    mUserChkSum = mSHA256.sum(User)
+End Sub
+
+Public Function login(ByRef User As String, ByRef Pass As String) As Boolean
+    'Public login As Boolean
+    'init all values needed to ask for the accountsettings of this useraccount
+    'for this we need to decrypt our configuration file for this user
+    ' - [IN] ByRef User As String: The username which is used to login
+    ' - [IN] ByRef Pass As String: The given password for this user
+    ' - returns true if login was possible
+    Dim data As String
+    Dim fnum As Integer
+    fnum = FreeFile
+    
+    'fill the filename var
+    Call SetFilenames(User)
+    
+    On Error Resume Next
+        'read the encrypted file from disk
+        Open mPath & mFile For Input As #fnum
+            data = Input$(LOF(fnum), fnum)
+        Close #fnum
+    On Error GoTo fileerror
+        If Len(data) = 0 Or data Is Nothing Then 'there is no acc file
+            fnum = FreeFile
+            'try to read backup (bak) file
+            Open mPath & mBakFile For Input As #fnum
+                data = Input$(LOF(fnum), fnum)
+            Close #fnum
+        End If
+    On Error GoTo 0
+    
+    'fill SHA256 sum var
+    Call SetUserSHA256(User)
+    'fill password
+    Call SetPassword(mUserChkSum, Pass)
+    
+    'base64 encoded, blowfish encrypted, huffman compressed data to plaintext
+    data = mHuffman.DecodeString(mBlowfish.DecryptString(data, mPass, True))
+    
+    If Left(data, Len(mUserChkSum)) = mUserChkSum Then 'is the file successfully decrypted
+        mUser = User
+        Call AccountReader(data)
+        'this var isn't needed anymore
+        Erase data
+    Else
+        login = False
+        Exit Function
+    End If
+    
+fileerror:
+    On Error GoTo 0
+    login = False
+    Exit Function
+    
+End Function
+
+Private Function AccountWriter(ByRef mAccSettings() As clsAccountSettings) As String
+    
+End Function
+
+Private Sub AccountReader(ByRef data As String, ByRef mAccSettings() As clsAccountSettings)
+    Dim i As Integer
+    Dim lastSeperator As Integer
+    Dim element As Integer
+    Dim partData As String
+    Dim foundEnd As Boolean
+    Dim reservedSpace As Integer
+    Dim currentAccount As Integer
+    'reserve space for first 10 accounts (and destroy existing data)
+    reservedSpace = 10
+    ReDim mAccSettings(reservedSpace)
+    'running thru all characters
+    For i = 0 To Len(data) - 1
+        If foundEnd Then
+            ReDim Preserve mAccSettings(CInt((elements - ConfHeaderLines) / ConfBodyLines))
+            Exit For
+        End If
+        If data(i) = vbLf Then
+            If element = 0 Then
+                'this is the SHA256 of user, ignoring
+            ElseIf element = 1 Then
+                'this is the last login time
+                LastLoginTime = CDate(Mid(data, lastSeperator, i - lastSeperator))
+            Else
+                partData = Mid(data, lastSeperator, i - lastSeperator)
+                If partData = "END" Then
+                    foundEnd = True
+                ElseIf partData = "-END" Then
+                    partData = "END"
+                Else
+                    currentAccount = CInt((elements - ConfHeaderLines) / ConfBodyLines)
+                    If currentAccount > reservedSpace Then
+                        reservedSpace = reservedSpace + 10
+                        ReDim Preserve mAccSettings(reservedSpace)
+                    End If
+                    Call mAccSettings(currentAccount) _
+                            .saveData((elements - ConfHeaderLines) Mod ConfBodyLines, partData)
+                End If
+            End If
+                
+            element = element + 1
+            lastSeperator = i
+        End If
+    Next i
+End Sub
+
+Private Sub SaveConfig(ByRef mAccSettings() As clsAccountSettings)
+    'Private SaveConfig
+    'savely writes all configdata encrypted to disk, should be called
+    'on every change of configurations
+    ' - [IN]ByRef mAccSettings() As clsAccountSettings: existing account
+    '   informations
+    Dim data As String
+    Dim fnum As Integer
+    fnum = FreeFile
+    
+    'FIXME: Build file string
+    
+    'plaintext to huffman compressed, blowfish encrypted, base64 encoded data
+    data = mBlowfish.EncryptString(mHuffman.EncodeString(data), mPass, True)
+    
+    'check if there is already a backupfile, if so we delete it
+    If FileExists(mPath & mBakFile) Then
+        Call FileSystem.Kill(mPath & mBakFile)
+    End If
+    
+    'if acc file exists
+    If FileExists(mPath & mFile) Then
+        'copy acc file as backup file
+        Call FileSystem.FileCopy(mPath & mFile, mPath & mBakFile)
+        'delete acc file
+        Call FileSystem.Kill(mPath & mFile)
+    End If
+    
+    'write data to acc file
+    Open mPath & mFile For Output As #fnum
+        Put fnum, , data
+    Close #fnum
+    
+End Sub

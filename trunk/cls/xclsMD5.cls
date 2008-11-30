@@ -55,11 +55,11 @@ End Property
 Property Get RegisterD() As String
     RegisterD = State(4)
 End Property
-Public Function DigestStrToHexStr(SourceString As String) As String
+Public Function sum(SourceString As String) As String
     MD5Init
     MD5Update Len(SourceString), StringToArray(SourceString)
     MD5Final
-    DigestStrToHexStr = GetValues
+    sum = GetValues
 End Function
 Public Function DigestFileToHexStr(InFile As String) As String
 On Error GoTo errorhandler
