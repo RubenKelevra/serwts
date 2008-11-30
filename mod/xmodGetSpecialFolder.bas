@@ -1,6 +1,8 @@
 Attribute VB_Name = "xmodGetSpecialFolder"
 Option Explicit
 
+'Author is Microsoft Source is MSDN
+
 Public Enum CSIDLS
   CSIDL_DESKTOP = &H0&  ' Desktop
   CSIDL_INTERNET = &H1& ' Internet
