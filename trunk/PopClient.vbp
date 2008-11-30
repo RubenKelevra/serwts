@@ -14,6 +14,7 @@ Class=xclsBase64; cls\xclsBase64.cls
 Class=xclsBlowfish; cls\xclsBlowfish.cls
 Class=xclsHuffman; cls\xclsHuffman.cls
 Class=xclsSHA256; cls\xclsSHA256.cls
+Class=xclsMD5; cls\xclsMD5.cls
 IconForm="frmLogin"
 Startup="frmMain"
 HelpFile=""
