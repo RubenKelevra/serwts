@@ -65,3 +65,11 @@ Private Sub cmdQuit_Click()
     'End Program immediately
     End
 End Sub
+
+Private Function testa(ByRef otto As String, ByVal fritz As Integer) As Boolean
+    'Private testa As Boolean
+    'Unsere Funktion tut nichts
+    ' - [IN] ByRef otto As String: Den Dateinamen der Datei
+    ' - [IN] ByVal fritz As Integer: fritz ist n toller hecht
+    ' - wenn datei existiert dann true
+End Function
