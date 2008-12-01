@@ -24,7 +24,7 @@ Private Declare Sub CopyMemoryPtr Lib "kernel32" _
 
 
 Private Const ConfHeaderLines = 3
-Private Const ConfBodyLines = 7
+Private Const ConfBodyLines = 8
 
 Private mPath As String     'Our configuration directory which holds all
                             'encrypted configuration files
@@ -40,7 +40,7 @@ Private mBakFile As String  'The backup file's filename which is the same filena
 Private mLoggedin As Boolean 'true if we have opened the configation file successfully
 Public LastLoginTime As Date
 Private mUserChkSum As String
-Public mAccountSettings As clsAccountSettings
+Private mAccountSettings() As clsAccountSettings
 
 Private mSHA256 As xclsSHA256
 Private mBlowfish As xclsBlowfish
@@ -163,7 +163,8 @@ Private Function AccountWriter(ByRef AccSettings() As clsAccountSettings) As Str
                 .mstrUsername & vbLf & _
                 .mstrPassword & vbLf & _
                 .mstrMboxPath & vbLf & _
-                CStr(.mdtmLastFetch) & vbLf
+                CStr(.mdtmLastFetch) & vbLf & _
+                CStr(.mblnForceSecuredAuthorisation) & vbLf
         End With
     Next i
     AccountWriter = AccountWriter & "END" & vbEOF
@@ -225,7 +226,7 @@ Private Sub AccountReader(ByRef Data As String, ByRef AccSettings() As clsAccoun
     Next i
 End Sub
 
-Public Sub SaveConfig(ByRef AccSettings() As clsAccountSettings)
+Private Sub SaveConfig()
     'Private SaveConfig
     'savely writes all configdata encrypted to disk, should be called
     'on every change of configurations
@@ -236,7 +237,7 @@ Public Sub SaveConfig(ByRef AccSettings() As clsAccountSettings)
     fnum = FreeFile
     
     'plaintext to huffman compressed, blowfish encrypted, base64 encoded data
-    Data = mBlowfish.EncryptString(mHuffman.EncodeString(AccountWriter(AccSettings)), mPass, True)
+    Data = mBlowfish.EncryptString(mHuffman.EncodeString(AccountWriter(mAccSettings)), mPass, True)
     
     'check if there is already a backupfile, if so we delete it
     If FileExists(mPath & mBakFile) Then
@@ -269,7 +270,7 @@ Public Sub logout()
     If Not mLoggedin Then
         Exit Sub
     End If
-    Call SaveConfig(mAccountSettings)
+    Call SaveConfig
     Call clearData
     
     mLoggedin = False
@@ -285,6 +286,14 @@ Public Function getAccountnames() As String()
     Next i
 End Function
 
+Private Function checkASIndex(ByRef index As Long) As Boolean
+    If (Not mLoggedin) Or (index < LBound(mAccountSettings)) _
+            Or (UBound(mAccountSettings) - LBound(mAccountSettings) < index) Then
+        Exit Function
+    End If
+    checkASIndex = True
+End Function
+
 Public Function deleteAccountSettings(ByRef index As Long) As Boolean
     'Public deleteAccountSetting As Boolean
     'delete one specified accountsettings from array
@@ -292,10 +301,10 @@ Public Function deleteAccountSettings(ByRef index As Long) As Boolean
     ' - true if AccountSettings has successfully deleted
     Dim lngPtr As Long 'pointer var
     
-    If (Not mLoggedin) Or (index < LBound(mAccountSettings)) _
-            Or (UBound(mAccountSettings) - LBound(mAccountSettings) < index) Then
+    If Not checkASIndex Then
         Exit Function
     End If
+    
     If index < UBound(mAccountSettings) - LBound(mAccountSettings) Then 'we don't have to delete the last element
         'now we have to copy the data after deleted element over it
         lngPtr = StrPtr(mAccountSettings(index))
@@ -305,8 +314,79 @@ Public Function deleteAccountSettings(ByRef index As Long) As Boolean
     ReDim Preserve mAccountSettings(UBound(mAccountSettings) - LBound(mAccountSettings) - 1)
     
     'we changed our configuration, we have to save it to disk
-    Call SaveConfig(mAccountSettings)
+    Call SaveConfig
     
     deleteAccountSettings = True
 End Function
 
+
+Public Sub addAccountSettings(ByRef AccountName As String, ByRef Server As String, ByRef Port As Integer, ByRef Username As String, ByRef Password As String, ForceSecuredAuthorisation As Boolean, Optional ByRef MboxPath As String = "")
+    'Public addAccountSettings
+    'we add a new mailaccount
+    ' - [IN] ByRef AccountName As String: The displayed name of the account
+    ' - [IN] ByRef Server As String: The POP3 server
+    ' - [IN] ByRef Port As Integer: Port of the server 0 means default
+    ' - [IN] ByRef Username As String: The username which is used to login
+    ' - [IN] ByRef Password As String: The password which is used to login
+    ' - [IN] Optional ByRef MboxPath As String = "":
+    'allocate space for new account
+    ReDim Preserve mAccountSettings(UBound(mAccountSettings) - LBound(mAccountSettings) + 1)
+    
+    With mAccountSettings(UBound(mAccountSettings) - LBound(mAccountSettings))
+        .mstrAccountName = AccountName
+        .mstrServer = Server
+        .mintPort = Port
+        .mstrUsername = Username
+        .mstrPassword = Password
+        .mstrMboxPath = MboxPath
+        .mdtmLastFetch = Nothing
+        .mblnForceSecuredAuthorisation = ForceSecuredAuthorisation
+    End With
+    
+    Call SaveConfig
+End Sub
+
+Public Function mailFetched(ByRef index As Long) As Boolean
+    'Public mailFetched As Boolean
+    'renew date/time of the given mail account
+    ' - returns true if everything is ok
+    If Not checkASIndex(index) Then
+        Exit Function
+    End If
+    
+    mAccountSettings(index).mdtmLastFetch = DateTime.Now
+    
+    Call SaveConfig
+    
+    mailFetched = True
+End Function
+
+Public Function changeName(ByRef index As Long, ByRef newName As String) As Boolean
+    'Public Function As Boolean
+    'changes the name of the given mail account
+    ' - returns true if everything is ok
+    If Not checkASIndex(index) Then
+        Exit Function
+    End If
+    
+    mAccountSettings(index).mstrAccountName = newName
+    
+    Call SaveConfig
+    
+    changeName = True
+End Function
+
+Public Function changeUser(ByRef index As Long, ByRef newUsername As String) As Boolean
+    'Public Function as Boolean
+    'changes the name of the user which is used to login to the given mail account
+    ' - returns true if everything is ok
+    If Not checkASIndex(index) Then
+        Exit Function
+    End If
+    
+    mAccountSettings(index).mstrUsername = newUsername
+    
+    Call SaveConfig
+    
+    changeUser = True
+End Function
