@@ -158,7 +158,7 @@ Private Function AccountWriter(ByRef AccSettings() As clsAccountSettings) As Str
         With AccSettings(i)
             AccountWriter = AccountWriter & _
                 .mstrAccountName & vbLf & _
-                .mstrServer & vbLf & _
+                .mstrPOP3Server & vbLf & _
                 CStr(.mintPort) & vbLf & _
                 .mstrUsername & vbLf & _
                 .mstrPassword & vbLf & _
@@ -198,7 +198,7 @@ Private Sub AccountReader(ByRef Data As String, ByRef AccSettings() As clsAccoun
                 'this is the (default) Maildir
                 mMailDir = Mid(Data, lastSeperator, i - lastSeperator)
                 If mMailDir = "" Then
-                    mMailDir = mPath & "Mail" & BackSlash
+                    mMailDir = getMailDir("", "")
                 End If
             ElseIf element = 2 Then
                 'this is the last login time
@@ -320,11 +320,11 @@ Public Function deleteAccountSettings(ByRef index As Long) As Boolean
 End Function
 
 
-Public Sub addAccountSettings(ByRef AccountName As String, ByRef Server As String, ByRef Port As Integer, ByRef Username As String, ByRef Password As String, ForceSecuredAuthorisation As Boolean, Optional ByRef MboxPath As String = "")
+Public Sub addAccountSettings(ByRef Accountname As String, ByRef POP3Server As String, ByRef Port As Integer, ByRef Username As String, ByRef Password As String, ForceSecuredAuthorisation As Boolean, Optional ByRef MboxPath As String = "")
     'Public addAccountSettings
     'we add a new mailaccount
     ' - [IN] ByRef AccountName As String: The displayed name of the account
-    ' - [IN] ByRef Server As String: The POP3 server
+    ' - [IN] ByRef POP3Server As String: The POP3 server address
     ' - [IN] ByRef Port As Integer: Port of the server 0 means default
     ' - [IN] ByRef Username As String: The username which is used to login
     ' - [IN] ByRef Password As String: The password which is used to login
@@ -333,8 +333,8 @@ Public Sub addAccountSettings(ByRef AccountName As String, ByRef Server As Strin
     ReDim Preserve mAccountSettings(UBound(mAccountSettings) - LBound(mAccountSettings) + 1)
     
     With mAccountSettings(UBound(mAccountSettings) - LBound(mAccountSettings))
-        .mstrAccountName = AccountName
-        .mstrServer = Server
+        .mstrAccountName = Accountname
+        .mstrPOP3Server = POP3Server
         .mintPort = Port
         .mstrUsername = Username
         .mstrPassword = Password
@@ -349,11 +349,12 @@ End Sub
 Public Function mailFetched(ByRef index As Long) As Boolean
     'Public mailFetched As Boolean
     'renew date/time of the given mail account
+    ' - [IN] ByRef index As Long: index of the mail account
     ' - returns true if everything is ok
     If Not checkASIndex(index) Then
         Exit Function
     End If
-    
+
     mAccountSettings(index).mdtmLastFetch = DateTime.Now
     
     Call SaveConfig
@@ -361,32 +362,213 @@ Public Function mailFetched(ByRef index As Long) As Boolean
     mailFetched = True
 End Function
 
-Public Function changeName(ByRef index As Long, ByRef newName As String) As Boolean
-    'Public Function As Boolean
-    'changes the name of the given mail account
+Public Function changeMailboxName(ByRef index As Long, ByRef newName As String) As Boolean
+    'Public changeMailboxName As Boolean
+    'change the name of the given mail account
+    ' - [IN] ByRef index As Long: index of the mail account
+    ' - [IN] ByRef newName As String: the new name if the mail account
     ' - returns true if everything is ok
+    Dim i As Integer
     If Not checkASIndex(index) Then
         Exit Function
     End If
+    
+    If mAccountSettings(index).mstrAccountName = newName Then 'we have nothing to do
+        changeMailboxName = True
+        Exit Function
+    End If
+    
+    'name of the mailaccount is the primary key, duplicates aren't allowed
+    'we have to check this
+    For i = LBound(mAccountSettings) To UBound(mAccountSettings) - LBound(mAccountSettings)
+        If (Not i = index) And _
+                Trim$(LCase$(mAccountSettings.mstrAccountName)) = _
+                    Trim$(LCase$(newName)) Then
+            Call Err.Raise(vbObjectError, , "The given name not unique, use a different name for your account")
+            Exit Function
+        End If
+    Next var
     
     mAccountSettings(index).mstrAccountName = newName
     
     Call SaveConfig
     
-    changeName = True
+    changeMailboxName = True
 End Function
 
-Public Function changeUser(ByRef index As Long, ByRef newUsername As String) As Boolean
-    'Public Function as Boolean
-    'changes the name of the user which is used to login to the given mail account
+Public Function changeMailUser(ByRef index As Long, ByRef newUsername As String) As Boolean
+    'Public changeMailUser As Boolean
+    'change the name of the user which is used to login to the given mail account
+    ' - [IN] ByRef index As Long: index of the mail account
+    ' - [IN] ByRef newUsername As String: the new username
     ' - returns true if everything is ok
     If Not checkASIndex(index) Then
         Exit Function
     End If
+    If Not mAccountSettings(index).mstrUsername = newUsername Then
+        mAccountSettings(index).mstrUsername = newUsername
+        
+        Call SaveConfig
+    End If
+    changeMailUser = True
+End Function
+
+Public Function changeMailPassword(ByRef index As Long, ByRef newPassword As String) As Boolean
+    'Public changeMailPassword As Boolean
+    'change the password which is used to login to the given mail account
+    ' - [IN] ByRef index As Long: index of the mail account
+    ' - [IN] ByRef newPassword As String: The new password
+    ' - returns true if everything is ok
+    If Not checkASIndex(index) Then
+        Exit Function
+    End If
+    If Not mAccountSettings(index).mstrPassword = newPassword Then
+        mAccountSettings(index).mstrPassword = newPassword
+        
+        Call SaveConfig
+    End If
+    changeMailPassword = True
+End Function
+
+Public Function changePOP3Server(ByRef index As Long, ByRef newPOP3Server As String) As Boolean
+    'Public changePOP3Server As Boolean
+    'change the POP3Server which is used fetch mails of the given mailaccount
+    ' - [IN] ByRef index As Long: index of the mail account
+    ' - [IN] ByRef newPOP3Server As String: the new POP3 server address
+    ' - returns true if everything is ok
+    If Not checkASIndex(index) Then
+        Exit Function
+    End If
+    If Not mAccountSettings(index).mstrPOP3Server = newPOP3Server Then
+        mAccountSettings(index).mstrPOP3Server = newPOP3Server
+        
+        Call SaveConfig
+    End If
+    changePOP3Server = True
+End Function
+
+Public Function changeForceSecuredAuthorisation(ByRef index As Long, newVal As Boolean) As Boolean
+    'Public changeForceSecuredAuthorisation As Boolean
+    'change the state of forcing secured authorisation of the given mailaccount
+    ' - [IN] ByRef index As Long: index of the mail account
+    ' - [IN] ByRef newVal As Boolean: The new state of this switch
+    ' - returns true if everything is ok
+    If Not checkASIndex(index) Then
+        Exit Function
+    End If
+    If Not mAccountSettings(index).mblnForceSecuredAuthorisation = newVal Then
+        mAccountSettings(index).mblnForceSecuredAuthorisation = newVal
+        
+        Call SaveConfig
+    End If
+    changeForceSecuredAuthorisation = True
+End Function
+
+Public Function changePOP3ServerPort(ByRef index As Long, newPort As Integer) As Boolean
+    'Public changePOP3ServerPort As Boolean
+    'change the port of the POP3 server of the given mailaccount
+    ' - [IN] ByRef index As Long: index of the mail account
+    ' - [IN] newPort As Integer: the new port, 0 means default
+    ' - returns true if everything is ok
+    If Not checkASIndex(index) Then
+        Exit Function
+    End If
+    If Not mAccountSettings(index).mintPort = newPort Then
+        mAccountSettings(index).mintPort = newPort
     
-    mAccountSettings(index).mstrUsername = newUsername
+        Call SaveConfig
+    End If
+    changePOP3ServerPort = True
+End Function
+
+Private Function getMailDir(ByRef MboxPath As String, ByRef Accountname As String) As String
+    If MboxPath = "" Then
+        getMailDir = mPath & "Mail" & BackSlash
+    Else
+        getMailDir = MboxPath
+        If Not Right(MboxPath, 1) = BackSlash Then
+            getMailDir = gettmaildir & BackSlash
+        End If
+    End If
+    If Not Accountname = "" Then
+        getMailDir = getMailDir & mMD5.sum(mSHA256.sum(Accountname)) & BackSlash
+    End If
+End Function
+
+Private Function moveMbox(ByRef index As Long, ByRef newPath As String, ByRef newAccountname As String)
+    Dim mboxfile As Variant
+    Dim sourceDirectory As String
+    Dim destinationDirectory As String
     
-    Call SaveConfig
+    With mAccountSettings(index)
+        If .mstrAccountName = newAccountname Then
+            If .mstrMboxPath = newPath Then 'there is nothing to do
+                changeMboxPath = True
+                Exit Function
+        End If
     
-    changeUser = True
+        'get old and new path
+    
+        sourceDirectory = getMailDir(.mstrMboxPath, .mstrAccountName)
+        destinationDirectory = getMailDir(newPath, newAccountname)
+    End With
+    
+    'check if directory is equal
+    If sourceDirectory = destinationDirectory Then 'there is nothing to do
+        changeMboxPath = True
+        Exit Function
+    End If
+    
+    'call closeMbox(index)
+    For Each mboxfile In getMboxFiles(index)
+        If Not FileExists(sourceDirectory & mboxfile) Then
+            Call Err.Raise(vbObjectError, , "Error mboxfile " & mboxfile & " couldn't be found")
+            'fixme: clean up
+            Exit Function
+        End If
+        'file seems to be there, we try to copy
+        On Error GoTo filecopyerror
+        Call FileSystem.FileCopy(sourceDirectory & mboxfile, destinationDirectory & mboxfile)
+        On Error GoTo 0
+    Next mboxfile
+    
+    For Each mboxfile In getMboxFiles(index)
+        If Not FileExists(destinationDirectory & mboxfile) Then
+            Call Err.Raise(vbObjectError, , "Error on copy, destination file does not exist anymore: " & mboxfile & "")
+            'fixme: clean up
+            Exit Function
+        End If
+        'destination file seems to be ok
+        On Error GoTo sourcefiledeleteerror
+        Call FileSystem.Kill(sourceDirectory & mboxfile)
+        On Error GoTo 0
+    Next mboxfile
+    
+filecopyerror:
+    Call Err.Raise(vbObjectError, , "File couldn't be copy to destination directory or couldn't be read" & vbCrLf & "Source: '" & sourceDirectory & mboxfile & "'" & vbCrLf & "Destination: '" & destinationDirectory & mboxfile & "'")
+    Exit Function
+sourcefiledeleteerror:
+    Call Err.Raise(vbObjectError, , "Sourcefile couldn't be deleted" & mboxfile)
+    Exit Function
+    
+End Function
+
+Private Function getMboxFiles(ByRef index As Long) As String()
+
+End Function
+
+Public Function changeMboxPath(ByRef index As Long, ByRef newPath As String) As Boolean
+    'Public changeMboxPath As Boolean
+    'change the path of the mbox of the given mailaccount
+    ' - [IN] ByRef index As Long: index of the mail account
+    ' - [IN] ByRef newPath As String: the new path of the mbox, "" means use default directory
+    ' - returns true if everything is ok
+
+    
+    If Not checkASIndex(index) Then
+        Exit Function
+    End If
+    
+    
+        
 End Function

@@ -14,7 +14,7 @@ Attribute VB_Exposed = False
 Option Explicit
 
 Public mstrAccountName As String
-Public mstrServer As String
+Public mstrPOP3Server As String
 Public mintPort As Integer
 Public mstrUsername As String
 Public mstrPassword As String
@@ -31,7 +31,7 @@ Public Sub saveData(ByRef index As Integer, ByRef Data As String)
         Case 0 'Account name
             mstrAccountName = Data
         Case 1 'Server
-            mstrSever = Data
+            mstrPOP3Server = Data
         Case 2 'Port
             If getVarType(Data) = 1 Then
                 If CInt(Data) <= 65536 Then
@@ -59,4 +59,3 @@ Public Sub saveData(ByRef index As Integer, ByRef Data As String)
         Case Else
     End Select
 End Sub
-
