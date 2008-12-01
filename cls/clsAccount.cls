@@ -15,6 +15,11 @@ Option Explicit
 
 Private Declare Function createDir _
  Lib "imagehlp.dll" (ByVal lpPath As String) As Long
+Private Declare Sub CopyMemoryPtr Lib "kernel32" _
+  Alias "RtlMoveMemory" ( _
+  ByVal Destination As Long, _
+  ByVal Source As Long, _
+  ByVal Length As Long)
 
 
 Private Const ConfHeaderLines = 2
@@ -30,8 +35,10 @@ Private mFile As String     'The encrypted file's filename which is the MD5 sum
                             'of the SHA-256 sum of mUser
 Private mBakFile As String  'The backup file's filename which is the same filename
                             'as mFile but with .bak extention
+Private mLoggedin As Boolean 'true if we have opened the configation file successfully
 Public LastLoginTime As Date
 Private mUserChkSum As String
+Public mAccountSettings As clsAccountSettings
 
 Private mSHA256 As xclsSHA256
 Private mBlowfish As xclsBlowfish
@@ -54,6 +61,7 @@ Private Sub Class_Initialize()
     Set mBlowfish = New xclsBlowfish
     Set mHuffman = New xclsHuffman
     Set mMD5 = New xclsMD5
+    Set mAccountSettings = New clsAccountSettings
 End Sub
 
 Private Sub SetFilenames(ByRef User As String)
@@ -119,16 +127,19 @@ Public Function login(ByRef User As String, ByRef Pass As String) As Boolean
     
     If Left(Data, Len(mUserChkSum)) = mUserChkSum Then 'is the file successfully decrypted
         mUser = User
-        Call AccountReader(Data)
+        Call AccountReader(Data, mAccountSettings)
         'this var isn't needed anymore
         Erase Data
+        mLoggedin = True
     Else
+        mLoggedin = False
         login = False
         Exit Function
     End If
     
 fileerror:
     On Error GoTo 0
+    mLoggedin = False
     login = False
     Exit Function
     
@@ -237,3 +248,31 @@ Private Sub SaveConfig(ByRef AccSettings() As clsAccountSettings)
         Put fnum, , Data
     Close #fnum
 End Sub
+
+Private Sub clearData()
+    'Private clearData
+    'erase all data for logout
+    Erase AccountSettings: LastLoginTime: mUser: mPass: mUserChkSum
+End Sub
+
+Public Sub logout()
+    'Public logout
+    'we going to save to disk and destroy in memory existing data for a save logout
+    If Not mLoggedin Then
+        Exit Sub
+    End If
+    Call SaveConfig(mAccountSettings)
+    Call clearData
+    
+    mLoggedin = False
+End Sub
+
+Public Function getAccountnames() As String()
+    'Public getAccountnames As String()
+    'Returns a stringarray which holds all accountnames
+    ' - all accountnames
+    Dim i As Integer
+    For i = LBound(mAccSettings) To UBound(mAccSettings) - LBound(mAccSettings)
+        Call getAccountnames.Join(mAccountSettings(i).mstrAccountName)
+    Next i
+End Function
