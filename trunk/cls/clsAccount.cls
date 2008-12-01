@@ -87,7 +87,7 @@ Public Function login(ByRef User As String, ByRef Pass As String) As Boolean
     ' - [IN] ByRef User As String: The username which is used to login
     ' - [IN] ByRef Pass As String: The given password for this user
     ' - returns true if login was possible
-    Dim data As String
+    Dim Data As String
     Dim fnum As Integer
     fnum = FreeFile
     
@@ -97,14 +97,14 @@ Public Function login(ByRef User As String, ByRef Pass As String) As Boolean
     On Error Resume Next
         'read the encrypted file from disk
         Open mPath & mFile For Input As #fnum
-            data = Input$(LOF(fnum), fnum)
+            Data = Input$(LOF(fnum), fnum)
         Close #fnum
     On Error GoTo fileerror
-        If Len(data) = 0 Or data Is Nothing Then 'there is no acc file
+        If Len(Data) = 0 Or Data Is Nothing Then 'there is no acc file
             fnum = FreeFile
             'try to read backup (bak) file
             Open mPath & mBakFile For Input As #fnum
-                data = Input$(LOF(fnum), fnum)
+                Data = Input$(LOF(fnum), fnum)
             Close #fnum
         End If
     On Error GoTo 0
@@ -115,13 +115,13 @@ Public Function login(ByRef User As String, ByRef Pass As String) As Boolean
     Call SetPassword(mUserChkSum, Pass)
     
     'base64 encoded, blowfish encrypted, huffman compressed data to plaintext
-    data = mHuffman.DecodeString(mBlowfish.DecryptString(data, mPass, True))
+    Data = mHuffman.DecodeString(mBlowfish.DecryptString(Data, mPass, True))
     
-    If Left(data, Len(mUserChkSum)) = mUserChkSum Then 'is the file successfully decrypted
+    If Left(Data, Len(mUserChkSum)) = mUserChkSum Then 'is the file successfully decrypted
         mUser = User
-        Call AccountReader(data)
+        Call AccountReader(Data)
         'this var isn't needed anymore
-        Erase data
+        Erase Data
     Else
         login = False
         Exit Function
@@ -134,11 +134,25 @@ fileerror:
     
 End Function
 
-Private Function AccountWriter(ByRef mAccSettings() As clsAccountSettings) As String
-    
+Private Function AccountWriter(ByRef AccSettings() As clsAccountSettings) As String
+    Dim i As Integer
+    AccountWriter = mUserChkSum & vbLf & CStr(LastLoginTime) & vbLf
+    For i = LBound(AccSettings) To UBound(AccSettings) - LBound(AccSettings)
+        With AccSettings(i)
+            AccountWriter = AccountWriter & _
+                .mstrAccountName & vbLf & _
+                .mstrServer & vbLf & _
+                CStr(.mintPort) & vbLf & _
+                .mstrUsername & vbLf & _
+                .mstrPassword & vbLf & _
+                .mstrMboxPath & vbLf & _
+                CStr(.mdtmLastFetch) & vbLf
+        End With
+    Next i
+    AccountWriter = AccountWriter & "END" & vbEOF
 End Function
 
-Private Sub AccountReader(ByRef data As String, ByRef mAccSettings() As clsAccountSettings)
+Private Sub AccountReader(ByRef Data As String, ByRef mAccSettings() As clsAccountSettings)
     Dim i As Integer
     Dim lastSeperator As Integer
     Dim element As Integer
@@ -150,19 +164,19 @@ Private Sub AccountReader(ByRef data As String, ByRef mAccSettings() As clsAccou
     reservedSpace = 10
     ReDim mAccSettings(reservedSpace)
     'running thru all characters
-    For i = 0 To Len(data) - 1
+    For i = 0 To Len(Data) - 1
         If foundEnd Then
             ReDim Preserve mAccSettings(CInt((elements - ConfHeaderLines) / ConfBodyLines))
             Exit For
         End If
-        If data(i) = vbLf Then
+        If Data(i) = vbLf Then
             If element = 0 Then
                 'this is the SHA256 of user, ignoring
             ElseIf element = 1 Then
                 'this is the last login time
-                LastLoginTime = CDate(Mid(data, lastSeperator, i - lastSeperator))
+                LastLoginTime = CDate(Mid(Data, lastSeperator, i - lastSeperator))
             Else
-                partData = Mid(data, lastSeperator, i - lastSeperator)
+                partData = Mid(Data, lastSeperator, i - lastSeperator)
                 If partData = "END" Then
                     foundEnd = True
                 ElseIf partData = "-END" Then
@@ -184,20 +198,18 @@ Private Sub AccountReader(ByRef data As String, ByRef mAccSettings() As clsAccou
     Next i
 End Sub
 
-Private Sub SaveConfig(ByRef mAccSettings() As clsAccountSettings)
+Private Sub SaveConfig(ByRef AccSettings() As clsAccountSettings)
     'Private SaveConfig
     'savely writes all configdata encrypted to disk, should be called
     'on every change of configurations
     ' - [IN]ByRef mAccSettings() As clsAccountSettings: existing account
     '   informations
-    Dim data As String
+    Dim Data As String
     Dim fnum As Integer
     fnum = FreeFile
     
-    'FIXME: Build file string
-    
     'plaintext to huffman compressed, blowfish encrypted, base64 encoded data
-    data = mBlowfish.EncryptString(mHuffman.EncodeString(data), mPass, True)
+    Data = mBlowfish.EncryptString(mHuffman.EncodeString(AccountWriter(AccSettings)), mPass, True)
     
     'check if there is already a backupfile, if so we delete it
     If FileExists(mPath & mBakFile) Then
@@ -214,7 +226,6 @@ Private Sub SaveConfig(ByRef mAccSettings() As clsAccountSettings)
     
     'write data to acc file
     Open mPath & mFile For Output As #fnum
-        Put fnum, , data
+        Put fnum, , Data
     Close #fnum
-    
 End Sub
