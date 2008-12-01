@@ -20,21 +20,22 @@ Public mstrUsername As String
 Public mstrPassword As String
 Public mstrMboxPath As String
 Public mdtmLastFetch As Date
+Public mblnForceSecuredAuthorisation As Boolean
 
-Public Sub saveData(ByRef index As Integer, ByRef data As String)
+Public Sub saveData(ByRef index As Integer, ByRef Data As String)
     'Public saveData
     'sets various values
     ' - [IN] ByRef index As Integer: the index of information which is given
     ' - [IN] ByRef data As String: the information which should be stored
     Select Case index
         Case 0 'Account name
-            mstrAccountName = data
+            mstrAccountName = Data
         Case 1 'Server
-            mstrSever = data
+            mstrSever = Data
         Case 2 'Port
-            If getVarType(data) = 1 Then
-                If CInt(data) <= 65536 Then
-                    mintPort = CInt(data)
+            If getVarType(Data) = 1 Then
+                If CInt(Data) <= 65536 Then
+                    mintPort = CInt(Data)
                 Else
                     mintPort = 0
                 End If
@@ -42,17 +43,19 @@ Public Sub saveData(ByRef index As Integer, ByRef data As String)
                 mintPort = 0
             End If
         Case 3 'Username
-            mstrUsername = data
+            mstrUsername = Data
         Case 4 'Password
-            mstrPassword = data
+            mstrPassword = Data
         Case 5 'MBox Path
-            mstrMboxPath = data
+            mstrMboxPath = Data
         Case 6 'Last fetch time
-            If getVarType(data) = 4 Or getVarType(data) = 5 Or getVarType(data) = 98 Then
-                mdtmLastFetch = CDate(data)
+            If getVarType(Data) = 4 Or getVarType(Data) = 5 Or getVarType(Data) = 98 Then
+                mdtmLastFetch = CDate(Data)
             Else
                 mdtmLastFetch = Nothing
             End If
+        Case 7 'force secured authorisation
+            mblnForceSecuredAuthorisation = CBool(Data)
         Case Else
     End Select
 End Sub
