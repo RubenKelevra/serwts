@@ -23,11 +23,12 @@ Private Declare Sub CopyMemoryPtr Lib "kernel32" _
   ByVal Length As Long)
 
 
-Private Const ConfHeaderLines = 2
+Private Const ConfHeaderLines = 3
 Private Const ConfBodyLines = 7
 
 Private mPath As String     'Our configuration directory which holds all
                             'encrypted configuration files
+Private mMailDir As String  'Directory where we save our mails
 Private mUser As String     'The given username - if it's set we had logged in
 Private mPass As String     'The password which can be used to open the
                             'config-file of the user (not plaintext -
@@ -152,7 +153,7 @@ Private Function AccountWriter(ByRef AccSettings() As clsAccountSettings) As Str
     ' - [IN] ByRef AccSettings() As clsAccountSettings: Source for the file
     ' - Final filestring
     Dim i As Integer
-    AccountWriter = mUserChkSum & vbLf & CStr(LastLoginTime) & vbLf
+    AccountWriter = mUserChkSum & vbLf & mMailDir & vbLf & CStr(LastLoginTime) & vbLf
     For i = LBound(AccSettings) To UBound(AccSettings) - LBound(AccSettings)
         With AccSettings(i)
             AccountWriter = AccountWriter & _
@@ -193,6 +194,12 @@ Private Sub AccountReader(ByRef Data As String, ByRef AccSettings() As clsAccoun
             If element = 0 Then
                 'this is the SHA256 of user, ignoring
             ElseIf element = 1 Then
+                'this is the (default) Maildir
+                mMailDir = Mid(Data, lastSeperator, i - lastSeperator)
+                If mMailDir = "" Then
+                    mMailDir = mPath & "Mail" & BackSlash
+                End If
+            ElseIf element = 2 Then
                 'this is the last login time
                 LastLoginTime = CDate(Mid(Data, lastSeperator, i - lastSeperator))
             Else
@@ -218,7 +225,7 @@ Private Sub AccountReader(ByRef Data As String, ByRef AccSettings() As clsAccoun
     Next i
 End Sub
 
-Private Sub SaveConfig(ByRef AccSettings() As clsAccountSettings)
+Public Sub SaveConfig(ByRef AccSettings() As clsAccountSettings)
     'Private SaveConfig
     'savely writes all configdata encrypted to disk, should be called
     'on every change of configurations
@@ -296,5 +303,10 @@ Public Function deleteAccountSettings(ByRef index As Long) As Boolean
         Call CopyMemoryPtr(lngPtr, VarPtr(lngPtr + 1), VarPtr(UBound(mAccountSettings) - LBound(mAccountSettings)) - VarPtr(index))
     End If
     ReDim Preserve mAccountSettings(UBound(mAccountSettings) - LBound(mAccountSettings) - 1)
+    
+    'we changed our configuration, we have to save it to disk
+    Call SaveConfig(mAccountSettings)
+    
     deleteAccountSettings = True
 End Function
+
