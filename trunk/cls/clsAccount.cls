@@ -135,6 +135,10 @@ fileerror:
 End Function
 
 Private Function AccountWriter(ByRef AccSettings() As clsAccountSettings) As String
+    'Private AccountWriter As String
+    'build the filestring which has to be crypted out of AccSettings
+    ' - [IN] ByRef AccSettings() As clsAccountSettings: Source for the file
+    ' - Final filestring
     Dim i As Integer
     AccountWriter = mUserChkSum & vbLf & CStr(LastLoginTime) & vbLf
     For i = LBound(AccSettings) To UBound(AccSettings) - LBound(AccSettings)
@@ -153,6 +157,10 @@ Private Function AccountWriter(ByRef AccSettings() As clsAccountSettings) As Str
 End Function
 
 Private Sub AccountReader(ByRef Data As String, ByRef AccSettings() As clsAccountSettings)
+    'Private AccountReader
+    'Reads the account data from a decrypted string to AccSettings
+    ' - [IN] ByRef Data As String: Decrypted data as string
+    ' - [IN] ByRef AccSettings() As clsAccountSettings: Target location
     Dim i As Integer
     Dim lastSeperator As Integer
     Dim element As Integer
