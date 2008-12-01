@@ -152,7 +152,7 @@ Private Function AccountWriter(ByRef AccSettings() As clsAccountSettings) As Str
     AccountWriter = AccountWriter & "END" & vbEOF
 End Function
 
-Private Sub AccountReader(ByRef Data As String, ByRef mAccSettings() As clsAccountSettings)
+Private Sub AccountReader(ByRef Data As String, ByRef AccSettings() As clsAccountSettings)
     Dim i As Integer
     Dim lastSeperator As Integer
     Dim element As Integer
@@ -162,11 +162,11 @@ Private Sub AccountReader(ByRef Data As String, ByRef mAccSettings() As clsAccou
     Dim currentAccount As Integer
     'reserve space for first 10 accounts (and destroy existing data)
     reservedSpace = 10
-    ReDim mAccSettings(reservedSpace)
+    ReDim AccSettings(reservedSpace)
     'running thru all characters
     For i = 0 To Len(Data) - 1
         If foundEnd Then
-            ReDim Preserve mAccSettings(CInt((elements - ConfHeaderLines) / ConfBodyLines))
+            ReDim Preserve AccSettings(CInt((elements - ConfHeaderLines) / ConfBodyLines))
             Exit For
         End If
         If Data(i) = vbLf Then
@@ -185,9 +185,9 @@ Private Sub AccountReader(ByRef Data As String, ByRef mAccSettings() As clsAccou
                     currentAccount = CInt((elements - ConfHeaderLines) / ConfBodyLines)
                     If currentAccount > reservedSpace Then
                         reservedSpace = reservedSpace + 10
-                        ReDim Preserve mAccSettings(reservedSpace)
+                        ReDim Preserve AccSettings(reservedSpace)
                     End If
-                    Call mAccSettings(currentAccount) _
+                    Call AccSettings(currentAccount) _
                             .saveData((elements - ConfHeaderLines) Mod ConfBodyLines, partData)
                 End If
             End If
@@ -202,7 +202,7 @@ Private Sub SaveConfig(ByRef AccSettings() As clsAccountSettings)
     'Private SaveConfig
     'savely writes all configdata encrypted to disk, should be called
     'on every change of configurations
-    ' - [IN]ByRef mAccSettings() As clsAccountSettings: existing account
+    ' - [IN]ByRef AccSettings() As clsAccountSettings: existing accounts
     '   informations
     Dim Data As String
     Dim fnum As Integer
