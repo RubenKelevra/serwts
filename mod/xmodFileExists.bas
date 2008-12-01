@@ -1,6 +1,13 @@
-Attribute VB_Name = "xmodFileExists"
+Attribute VB_Name = "xmodFileOperations"
 Option Explicit
  
+'DLL call to create a path recursive, and check on low level if path exists
+Public Declare Function createDir _
+ Lib "imagehlp.dll" (ByVal lpPath As String) As Long
+ 
+'DLL call to copy a part of memory which is specified to another location via pointer
+Public Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (ByVal Destination As Long, ByVal Source As Long, ByVal Length As Long)
+
 'Author is "RobDog888" from www.vbforums.com
 
 Private Const OF_EXIST         As Long = &H4000

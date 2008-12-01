@@ -32,7 +32,6 @@ Private Const k_bytShift2 As Byte = 4
 Private Const k_bytShift4 As Byte = 16
 Private Const k_bytShift6 As Byte = 64
 Private Const k_lMaxBytesPerLine As Long = 152
-Private Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (ByVal Destination As Long, ByVal Source As Long, ByVal Length As Long)
 
 Public Function Decode64(sInput As String) As String
     If sInput = "" Then Exit Function
@@ -88,7 +87,7 @@ Public Function Encode64(ByRef sInput As String) As String
 End Function
 
 Public Function EncodeArray64(ByRef bytInput() As Byte) As String
-    On Error GoTo ErrorHandler
+    On Error GoTo errorhandler
     
     Dim bytWorkspace() As Byte, bytResult() As Byte
     Dim bytCrLf(0 To 3) As Byte, lCounter As Long
@@ -160,7 +159,7 @@ Public Function EncodeArray64(ByRef bytInput() As Byte) As String
     End If
     Exit Function
 
-ErrorHandler:
+errorhandler:
     Erase bytResult
     EncodeArray64 = bytResult
 End Function

@@ -13,16 +13,6 @@ Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 Option Explicit
 
-Private Declare Function createDir _
- Lib "imagehlp.dll" (ByVal lpPath As String) As Long
- 
-Private Declare Sub CopyMemoryPtr Lib "kernel32" _
-  Alias "RtlMoveMemory" ( _
-  ByVal Destination As Long, _
-  ByVal Source As Long, _
-  ByVal Length As Long)
-
-
 Private Const ConfHeaderLines = 3
 Private Const ConfBodyLines = 8
 
@@ -56,14 +46,13 @@ Private Sub Class_Initialize()
     
     'creating folder if it isn't existing
     If Not (CBool(createDir(mPath))) Then
-        Call Err.Raise(vbObjectError, , "Application directory couldn't be created, check filesystem rights")
+        Call Err.Raise(vbObjectError, , "Application directory couldn't be created, check filesystem permissions")
     End If
     
     Set mSHA256 = New xclsSHA256
     Set mBlowfish = New xclsBlowfish
     Set mHuffman = New xclsHuffman
     Set mMD5 = New xclsMD5
-    Set mAccountSettings = New clsAccountSettings
 End Sub
 
 Private Sub SetFilenames(ByRef User As String)
@@ -110,7 +99,7 @@ Public Function login(ByRef User As String, ByRef Pass As String) As Boolean
             Data = Input$(LOF(fnum), fnum)
         Close #fnum
     On Error GoTo fileerror
-        If Len(Data) = 0 Or Data Is Nothing Then 'there is no acc file
+        If Len(Data) = 0 Or Data = "" Then 'there is no acc file
             fnum = FreeFile
             'try to read backup (bak) file
             Open mPath & mBakFile For Input As #fnum
@@ -131,7 +120,7 @@ Public Function login(ByRef User As String, ByRef Pass As String) As Boolean
         mUser = User
         Call AccountReader(Data, mAccountSettings)
         'this var isn't needed anymore
-        Erase Data
+        Data = ""
         mLoggedin = True
     Else
         mLoggedin = False
@@ -186,12 +175,12 @@ Private Sub AccountReader(ByRef Data As String, ByRef AccSettings() As clsAccoun
     reservedSpace = 10
     ReDim AccSettings(reservedSpace)
     'running thru all characters
-    For i = LBound(Data) To UBound(Data) - LBound(Data)
+    For i = 0 To Len(Data) - 1
         If foundEnd Then
-            ReDim Preserve AccSettings(CInt((elements - ConfHeaderLines) / ConfBodyLines))
+            ReDim Preserve AccSettings(CInt((element - ConfHeaderLines) / ConfBodyLines))
             Exit For
         End If
-        If Data(i) = vbLf Then
+        If Mid(Data, i, 1) = vbLf Then
             If element = 0 Then
                 'this is the SHA256 of user, ignoring
             ElseIf element = 1 Then
@@ -210,13 +199,13 @@ Private Sub AccountReader(ByRef Data As String, ByRef AccSettings() As clsAccoun
                 ElseIf partData = "-END" Then
                     partData = "END"
                 Else
-                    currentAccount = CInt((elements - ConfHeaderLines) / ConfBodyLines)
+                    currentAccount = CInt((element - ConfHeaderLines) / ConfBodyLines)
                     If currentAccount > reservedSpace Then
                         reservedSpace = reservedSpace + 10
                         ReDim Preserve AccSettings(reservedSpace)
                     End If
                     Call AccSettings(currentAccount) _
-                            .saveData((elements - ConfHeaderLines) Mod ConfBodyLines, partData)
+                            .saveData((element - ConfHeaderLines) Mod ConfBodyLines, partData)
                 End If
             End If
                 
@@ -237,7 +226,7 @@ Private Sub SaveConfig()
     fnum = FreeFile
     
     'plaintext to huffman compressed, blowfish encrypted, base64 encoded data
-    Data = mBlowfish.EncryptString(mHuffman.EncodeString(AccountWriter(mAccSettings)), mPass, True)
+    Data = mBlowfish.EncryptString(mHuffman.EncodeString(AccountWriter(mAccountSettings)), mPass, True)
     
     'check if there is already a backupfile, if so we delete it
     If FileExists(mPath & mBakFile) Then
@@ -261,7 +250,11 @@ End Sub
 Private Sub clearData()
     'Private clearData
     'erase all data for logout
-    Erase AccountSettings: LastLoginTime: mUser: mPass: mUserChkSum
+    Erase mAccountSettings
+    LastLoginTime = 0
+    mUser = ""
+    mPass = ""
+    mUserChkSum = ""
 End Sub
 
 Public Sub logout()
@@ -281,9 +274,12 @@ Public Function getAccountnames() As String()
     'Returns a stringarray which holds all accountnames
     ' - all accountnames
     Dim i As Integer
-    For i = LBound(mAccSettings) To UBound(mAccSettings) - LBound(mAccSettings)
-        Call getAccountnames.Join(mAccountSettings(i).mstrAccountName)
+    Dim str() As String
+    ReDim str(UBound(mAccountSettings) - LBound(mAccountSettings))
+    For i = LBound(mAccountSettings) To UBound(mAccountSettings) - LBound(mAccountSettings)
+         str(i) = mAccountSettings(i).mstrAccountName
     Next i
+    getAccountnames = str
 End Function
 
 Private Function checkASIndex(ByRef index As Long) As Boolean
@@ -301,7 +297,7 @@ Public Function deleteAccountSettings(ByRef index As Long) As Boolean
     ' - true if AccountSettings has successfully deleted
     Dim lngPtr As Long 'pointer var
     
-    If Not checkASIndex Then
+    If Not checkASIndex(index) Then
         Exit Function
     End If
     
@@ -309,7 +305,7 @@ Public Function deleteAccountSettings(ByRef index As Long) As Boolean
         'now we have to copy the data after deleted element over it
         lngPtr = StrPtr(mAccountSettings(index))
         
-        Call CopyMemoryPtr(lngPtr, VarPtr(lngPtr + 1), VarPtr(UBound(mAccountSettings) - LBound(mAccountSettings)) - VarPtr(index))
+        Call CopyMemory(lngPtr, VarPtr(lngPtr + 1), VarPtr(UBound(mAccountSettings) - LBound(mAccountSettings)) - VarPtr(index))
     End If
     ReDim Preserve mAccountSettings(UBound(mAccountSettings) - LBound(mAccountSettings) - 1)
     
@@ -339,7 +335,7 @@ Public Sub addAccountSettings(ByRef Accountname As String, ByRef POP3Server As S
         .mstrUsername = Username
         .mstrPassword = Password
         .mstrMboxPath = MboxPath
-        .mdtmLastFetch = Nothing
+        .mdtmLastFetch = 0
         .mblnForceSecuredAuthorisation = ForceSecuredAuthorisation
     End With
     
@@ -382,12 +378,12 @@ Public Function changeMailboxName(ByRef index As Long, ByRef newName As String) 
     'we have to check this
     For i = LBound(mAccountSettings) To UBound(mAccountSettings) - LBound(mAccountSettings)
         If (Not i = index) And _
-                Trim$(LCase$(mAccountSettings.mstrAccountName)) = _
+                Trim$(LCase$(mAccountSettings(i).mstrAccountName)) = _
                     Trim$(LCase$(newName)) Then
             Call Err.Raise(vbObjectError, , "The given name not unique, use a different name for your account")
             Exit Function
         End If
-    Next var
+    Next i
     
     mAccountSettings(index).mstrAccountName = newName
     
@@ -487,12 +483,20 @@ Private Function getMailDir(ByRef MboxPath As String, ByRef Accountname As Strin
     Else
         getMailDir = MboxPath
         If Not Right(MboxPath, 1) = BackSlash Then
-            getMailDir = gettmaildir & BackSlash
+            getMailDir = getMailDir & BackSlash
         End If
     End If
     If Not Accountname = "" Then
         getMailDir = getMailDir & mMD5.sum(mSHA256.sum(Accountname)) & BackSlash
     End If
+End Function
+
+Private Function closeMBox(ByRef index As Long)
+    
+End Function
+
+Private Function openMBox(ByRef index As Long)
+    
 End Function
 
 Private Function moveMbox(ByRef index As Long, ByRef newPath As String, ByRef newAccountname As String)
@@ -503,8 +507,9 @@ Private Function moveMbox(ByRef index As Long, ByRef newPath As String, ByRef ne
     With mAccountSettings(index)
         If .mstrAccountName = newAccountname Then
             If .mstrMboxPath = newPath Then 'there is nothing to do
-                changeMboxPath = True
+                moveMbox = True
                 Exit Function
+            End If
         End If
     
         'get old and new path
@@ -515,11 +520,11 @@ Private Function moveMbox(ByRef index As Long, ByRef newPath As String, ByRef ne
     
     'check if directory is equal
     If sourceDirectory = destinationDirectory Then 'there is nothing to do
-        changeMboxPath = True
+        moveMbox = True
         Exit Function
     End If
     
-    'call closeMbox(index)
+    Call closeMBox(index)
     For Each mboxfile In getMboxFiles(index)
         If Not FileExists(sourceDirectory & mboxfile) Then
             Call Err.Raise(vbObjectError, , "Error mboxfile " & mboxfile & " couldn't be found")
