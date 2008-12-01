@@ -15,6 +15,7 @@ Option Explicit
 
 Private Declare Function createDir _
  Lib "imagehlp.dll" (ByVal lpPath As String) As Long
+ 
 Private Declare Sub CopyMemoryPtr Lib "kernel32" _
   Alias "RtlMoveMemory" ( _
   ByVal Destination As Long, _
@@ -183,7 +184,7 @@ Private Sub AccountReader(ByRef Data As String, ByRef AccSettings() As clsAccoun
     reservedSpace = 10
     ReDim AccSettings(reservedSpace)
     'running thru all characters
-    For i = 0 To Len(Data) - 1
+    For i = LBound(Data) To UBound(Data) - LBound(Data)
         If foundEnd Then
             ReDim Preserve AccSettings(CInt((elements - ConfHeaderLines) / ConfBodyLines))
             Exit For
@@ -275,4 +276,25 @@ Public Function getAccountnames() As String()
     For i = LBound(mAccSettings) To UBound(mAccSettings) - LBound(mAccSettings)
         Call getAccountnames.Join(mAccountSettings(i).mstrAccountName)
     Next i
+End Function
+
+Public Function deleteAccountSettings(ByRef index As Long) As Boolean
+    'Public deleteAccountSetting As Boolean
+    'delete one specified accountsettings from array
+    ' - [IN] ByRef index as Long: position which has to be deleted
+    ' - true if AccountSettings has successfully deleted
+    Dim lngPtr As Long 'pointer var
+    
+    If (Not mLoggedin) Or (index < LBound(mAccountSettings)) _
+            Or (UBound(mAccountSettings) - LBound(mAccountSettings) < index) Then
+        Exit Function
+    End If
+    If index < UBound(mAccountSettings) - LBound(mAccountSettings) Then 'we don't have to delete the last element
+        'now we have to copy the data after deleted element over it
+        lngPtr = StrPtr(mAccountSettings(index))
+        
+        Call CopyMemoryPtr(lngPtr, VarPtr(lngPtr + 1), VarPtr(UBound(mAccountSettings) - LBound(mAccountSettings)) - VarPtr(index))
+    End If
+    ReDim Preserve mAccountSettings(UBound(mAccountSettings) - LBound(mAccountSettings) - 1)
+    deleteAccountSettings = True
 End Function
