@@ -33,7 +33,7 @@ Private Type HUFFMANTREE
   ParentNode As Integer
   RightNode As Integer
   LeftNode As Integer
-  Value As Integer
+  value As Integer
   Weight As Long
 End Type
 
@@ -41,8 +41,6 @@ Private Type ByteArray
   Count As Byte
   Data() As Byte
 End Type
-
-Private Declare Sub CopyMem Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, Source As Any, ByVal Length As Long)
 
 Public Sub EncodeFile(SourceFile As String, DestFile As String)
     Dim ByteArray() As Byte, Filenr As Integer
@@ -93,7 +91,7 @@ Private Sub CreateTree(Nodes() As HUFFMANTREE, NodesCount As Long, Char As Long,
                 Nodes(NodesCount).ParentNode = NodeIndex
                 Nodes(NodesCount).LeftNode = -1
                 Nodes(NodesCount).RightNode = -1
-                Nodes(NodesCount).Value = -1
+                Nodes(NodesCount).value = -1
                 NodesCount = NodesCount + 1
             End If
             NodeIndex = Nodes(NodeIndex).LeftNode
@@ -103,7 +101,7 @@ Private Sub CreateTree(Nodes() As HUFFMANTREE, NodesCount As Long, Char As Long,
                 Nodes(NodesCount).ParentNode = NodeIndex
                 Nodes(NodesCount).LeftNode = -1
                 Nodes(NodesCount).RightNode = -1
-                Nodes(NodesCount).Value = -1
+                Nodes(NodesCount).value = -1
                 NodesCount = NodesCount + 1
             End If
             NodeIndex = Nodes(NodeIndex).RightNode
@@ -111,10 +109,10 @@ Private Sub CreateTree(Nodes() As HUFFMANTREE, NodesCount As Long, Char As Long,
             Stop
         End If
     Next
-    Nodes(NodeIndex).Value = Char
+    Nodes(NodeIndex).value = Char
 End Sub
 Public Sub EncodeByte(ByteArray() As Byte, ByteLen As Long)
-    Dim I As Long, J As Long, Char As Byte, BitPos As Byte, lNode1 As Long
+    Dim i As Long, J As Long, Char As Byte, BitPos As Byte, lNode1 As Long
     Dim lNode2 As Long, lNodes As Long, lLength As Long, Count As Integer
     Dim lWeight1 As Long, lWeight2 As Long, Result() As Byte, ByteValue As Byte
     Dim ResultLen As Long, Bytes As ByteArray, NodesCount As Integer, NewProgress As Integer
@@ -123,7 +121,7 @@ Public Sub EncodeByte(ByteArray() As Byte, ByteLen As Long)
   
     If (ByteLen = 0) Then
         ReDim Preserve ByteArray(0 To ByteLen + 3)
-        If (ByteLen > 0) Then Call CopyMem(ByteArray(4), ByteArray(0), ByteLen)
+        If (ByteLen > 0) Then Call CopyMemory(ByteArray(4), ByteArray(0), ByteLen)
         ByteArray(0) = 72
         ByteArray(1) = 69
         ByteArray(2) = 48
@@ -138,21 +136,21 @@ Public Sub EncodeByte(ByteArray() As Byte, ByteLen As Long)
     Result(3) = 13
     ResultLen = 4
   
-    For I = 0 To (ByteLen - 1)
-        CharCount(ByteArray(I)) = CharCount(ByteArray(I)) + 1
-        If (I Mod 1000 = 0) Then
-            NewProgress = I / ByteLen * PROGRESS_CALCFREQUENCY
+    For i = 0 To (ByteLen - 1)
+        CharCount(ByteArray(i)) = CharCount(ByteArray(i)) + 1
+        If (i Mod 1000 = 0) Then
+            NewProgress = i / ByteLen * PROGRESS_CALCFREQUENCY
             If (NewProgress <> CurrProgress) Then
                 CurrProgress = NewProgress
                 RaiseEvent Progress(CurrProgress)
             End If
         End If
     Next
-    For I = 0 To 255
-        If (CharCount(I) > 0) Then
+    For i = 0 To 255
+        If (CharCount(i) > 0) Then
             With Nodes(NodesCount)
-                .Weight = CharCount(I)
-                .Value = I
+                .Weight = CharCount(i)
+                .value = i
                 .LeftNode = -1
                 .RightNode = -1
                 .ParentNode = -1
@@ -163,30 +161,30 @@ Public Sub EncodeByte(ByteArray() As Byte, ByteLen As Long)
   
     For lNodes = NodesCount To 2 Step -1
         lNode1 = -1: lNode2 = -1
-        For I = 0 To (NodesCount - 1)
-            If (Nodes(I).ParentNode = -1) Then
+        For i = 0 To (NodesCount - 1)
+            If (Nodes(i).ParentNode = -1) Then
                 If (lNode1 = -1) Then
-                    lWeight1 = Nodes(I).Weight
-                    lNode1 = I
+                    lWeight1 = Nodes(i).Weight
+                    lNode1 = i
                 ElseIf (lNode2 = -1) Then
-                    lWeight2 = Nodes(I).Weight
-                    lNode2 = I
-                ElseIf (Nodes(I).Weight < lWeight1) Then
-                    If (Nodes(I).Weight < lWeight2) Then
+                    lWeight2 = Nodes(i).Weight
+                    lNode2 = i
+                ElseIf (Nodes(i).Weight < lWeight1) Then
+                    If (Nodes(i).Weight < lWeight2) Then
                         If (lWeight1 < lWeight2) Then
-                            lWeight2 = Nodes(I).Weight
-                            lNode2 = I
+                            lWeight2 = Nodes(i).Weight
+                            lNode2 = i
                         Else
-                            lWeight1 = Nodes(I).Weight
-                            lNode1 = I
+                            lWeight1 = Nodes(i).Weight
+                            lNode1 = i
                         End If
                     Else
-                        lWeight1 = Nodes(I).Weight
-                        lNode1 = I
+                        lWeight1 = Nodes(i).Weight
+                        lNode1 = i
                     End If
-                ElseIf (Nodes(I).Weight < lWeight2) Then
-                    lWeight2 = Nodes(I).Weight
-                    lNode2 = I
+                ElseIf (Nodes(i).Weight < lWeight2) Then
+                    lWeight2 = Nodes(i).Weight
+                    lNode2 = i
                 End If
             End If
         Next
@@ -196,7 +194,7 @@ Public Sub EncodeByte(ByteArray() As Byte, ByteLen As Long)
             .LeftNode = lNode1
             .RightNode = lNode2
             .ParentNode = -1
-            .Value = -1
+            .value = -1
         End With
     
         Nodes(lNode1).ParentNode = NodesCount
@@ -207,14 +205,14 @@ Public Sub EncodeByte(ByteArray() As Byte, ByteLen As Long)
     ReDim Bytes.Data(0 To 255)
     Call CreateBitSequences(Nodes(), NodesCount - 1, Bytes, CharValue)
   
-    For I = 0 To 255
-        If (CharCount(I) > 0) Then lLength = lLength + CharValue(I).Count * CharCount(I)
+    For i = 0 To 255
+        If (CharCount(i) > 0) Then lLength = lLength + CharValue(i).Count * CharCount(i)
     Next
     lLength = IIf(lLength Mod 8 = 0, lLength \ 8, lLength \ 8 + 1)
   
     If ((lLength = 0) Or (lLength > ByteLen)) Then
         ReDim Preserve ByteArray(0 To ByteLen + 3)
-        Call CopyMem(ByteArray(4), ByteArray(0), ByteLen)
+        Call CopyMemory(ByteArray(4), ByteArray(0), ByteLen)
         ByteArray(0) = 72
         ByteArray(1) = 69
         ByteArray(2) = 48
@@ -223,10 +221,10 @@ Public Sub EncodeByte(ByteArray() As Byte, ByteLen As Long)
     End If
   
     Char = 0
-    For I = 0 To (ByteLen - 1)
-        Char = Char Xor ByteArray(I)
-        If (I Mod 10000 = 0) Then
-            NewProgress = I / ByteLen * PROGRESS_CALCCRC + PROGRESS_CALCFREQUENCY
+    For i = 0 To (ByteLen - 1)
+        Char = Char Xor ByteArray(i)
+        If (i Mod 10000 = 0) Then
+            NewProgress = i / ByteLen * PROGRESS_CALCCRC + PROGRESS_CALCFREQUENCY
             If (NewProgress <> CurrProgress) Then
                 CurrProgress = NewProgress
                 RaiseEvent Progress(CurrProgress)
@@ -235,7 +233,7 @@ Public Sub EncodeByte(ByteArray() As Byte, ByteLen As Long)
     Next
     Result(ResultLen) = Char
     ResultLen = ResultLen + 1
-    Call CopyMem(Result(ResultLen), ByteLen, 4)
+    Call CopyMemory(Result(ResultLen), ByteLen, 4)
     ResultLen = ResultLen + 4
     BitValue(0) = 2 ^ 0
     BitValue(1) = 2 ^ 1
@@ -246,19 +244,19 @@ Public Sub EncodeByte(ByteArray() As Byte, ByteLen As Long)
     BitValue(6) = 2 ^ 6
     BitValue(7) = 2 ^ 7
     Count = 0
-    For I = 0 To 255
-        If (CharValue(I).Count > 0) Then Count = Count + 1
+    For i = 0 To 255
+        If (CharValue(i).Count > 0) Then Count = Count + 1
     Next
-    Call CopyMem(Result(ResultLen), Count, 2)
+    Call CopyMemory(Result(ResultLen), Count, 2)
     ResultLen = ResultLen + 2
     Count = 0
-    For I = 0 To 255
-        If (CharValue(I).Count > 0) Then
-            Result(ResultLen) = I
+    For i = 0 To 255
+        If (CharValue(i).Count > 0) Then
+            Result(ResultLen) = i
             ResultLen = ResultLen + 1
-            Result(ResultLen) = CharValue(I).Count
+            Result(ResultLen) = CharValue(i).Count
             ResultLen = ResultLen + 1
-            Count = Count + 16 + CharValue(I).Count
+            Count = Count + 16 + CharValue(i).Count
         End If
     Next
   
@@ -266,8 +264,8 @@ Public Sub EncodeByte(ByteArray() As Byte, ByteLen As Long)
   
     BitPos = 0
     ByteValue = 0
-    For I = 0 To 255
-        With CharValue(I)
+    For i = 0 To 255
+        With CharValue(i)
             If (.Count > 0) Then
                 For J = 0 To (.Count - 1)
                     If (.Data(J)) Then ByteValue = ByteValue + BitValue(BitPos)
@@ -291,8 +289,8 @@ Public Sub EncodeByte(ByteArray() As Byte, ByteLen As Long)
   
     Char = 0
     BitPos = 0
-    For I = 0 To (ByteLen - 1)
-        With CharValue(ByteArray(I))
+    For i = 0 To (ByteLen - 1)
+        With CharValue(ByteArray(i))
             For J = 0 To (.Count - 1)
                 If (.Data(J) = 1) Then Char = Char + BitValue(BitPos)
                 BitPos = BitPos + 1
@@ -304,8 +302,8 @@ Public Sub EncodeByte(ByteArray() As Byte, ByteLen As Long)
                 End If
             Next
         End With
-        If (I Mod 10000 = 0) Then
-            NewProgress = I / ByteLen * PROGRESS_ENCODING + PROGRESS_CALCCRC + PROGRESS_CALCFREQUENCY
+        If (i Mod 10000 = 0) Then
+            NewProgress = i / ByteLen * PROGRESS_ENCODING + PROGRESS_CALCCRC + PROGRESS_CALCFREQUENCY
             If (NewProgress <> CurrProgress) Then
                 CurrProgress = NewProgress
                 RaiseEvent Progress(CurrProgress)
@@ -318,7 +316,7 @@ Public Sub EncodeByte(ByteArray() As Byte, ByteLen As Long)
         ResultLen = ResultLen + 1
     End If
     ReDim ByteArray(0 To ResultLen - 1)
-    Call CopyMem(ByteArray(0), Result(0), ResultLen)
+    Call CopyMemory(ByteArray(0), Result(0), ResultLen)
     If (CurrProgress <> 100) Then RaiseEvent Progress(100)
 End Sub
 Public Function DecodeString(Text As String) As String
@@ -334,7 +332,7 @@ Public Function EncodeString(Text As String) As String
     EncodeString = StrConv(ByteArray(), vbUnicode)
 End Function
 Public Sub DecodeByte(ByteArray() As Byte, ByteLen As Long)
-    Dim I As Long, J As Long, Pos As Long, Char As Byte, CurrPos As Long
+    Dim i As Long, J As Long, Pos As Long, Char As Byte, CurrPos As Long
     Dim Count As Integer, CheckSum As Byte, Result() As Byte, BitPos As Integer
     Dim NodeIndex As Long, ByteValue As Byte, ResultLen As Long, NodesCount As Long
     Dim lResultLen As Long, NewProgress As Integer, CurrProgress As Integer, BitValue(0 To 7) As Byte
@@ -342,7 +340,7 @@ Public Sub DecodeByte(ByteArray() As Byte, ByteLen As Long)
       
     If (ByteArray(0) <> 72) Or (ByteArray(1) <> 69) Or (ByteArray(3) <> 13) Then
     ElseIf (ByteArray(2) = 48) Then
-        Call CopyMem(ByteArray(0), ByteArray(4), ByteLen - 4)
+        Call CopyMemory(ByteArray(0), ByteArray(4), ByteLen - 4)
         ReDim Preserve ByteArray(0 To ByteLen - 5)
         Exit Sub
     ElseIf (ByteArray(2) <> 51) Then
@@ -354,15 +352,15 @@ Public Sub DecodeByte(ByteArray() As Byte, ByteLen As Long)
     CheckSum = ByteArray(CurrPos - 1)
     CurrPos = CurrPos + 1
       
-    Call CopyMem(ResultLen, ByteArray(CurrPos - 1), 4)
+    Call CopyMemory(ResultLen, ByteArray(CurrPos - 1), 4)
     CurrPos = CurrPos + 4
     lResultLen = ResultLen
     If (ResultLen = 0) Then Exit Sub
     ReDim Result(0 To ResultLen - 1)
-    Call CopyMem(Count, ByteArray(CurrPos - 1), 2)
+    Call CopyMemory(Count, ByteArray(CurrPos - 1), 2)
     CurrPos = CurrPos + 2
     
-    For I = 1 To Count
+    For i = 1 To Count
         With CharValue(ByteArray(CurrPos - 1))
             CurrPos = CurrPos + 1
             .Count = ByteArray(CurrPos - 1)
@@ -384,8 +382,8 @@ Public Sub DecodeByte(ByteArray() As Byte, ByteLen As Long)
     CurrPos = CurrPos + 1
     BitPos = 0
     
-    For I = 0 To 255
-        With CharValue(I)
+    For i = 0 To 255
+        With CharValue(i)
             If (.Count > 0) Then
                 For J = 0 To (.Count - 1)
                     If (ByteValue And BitValue(BitPos)) Then .Data(J) = 1
@@ -406,10 +404,10 @@ Public Sub DecodeByte(ByteArray() As Byte, ByteLen As Long)
     Nodes(0).LeftNode = -1
     Nodes(0).RightNode = -1
     Nodes(0).ParentNode = -1
-    Nodes(0).Value = -1
+    Nodes(0).value = -1
     
-    For I = 0 To 255
-        Call CreateTree(Nodes(), NodesCount, I, CharValue(I))
+    For i = 0 To 255
+        Call CreateTree(Nodes(), NodesCount, i, CharValue(i))
     Next
       
     ResultLen = 0
@@ -417,8 +415,8 @@ Public Sub DecodeByte(ByteArray() As Byte, ByteLen As Long)
         ByteValue = ByteArray(CurrPos - 1)
         For BitPos = 0 To 7
             If (ByteValue And BitValue(BitPos)) Then NodeIndex = Nodes(NodeIndex).RightNode Else NodeIndex = Nodes(NodeIndex).LeftNode
-            If (Nodes(NodeIndex).Value > -1) Then
-                Result(ResultLen) = Nodes(NodeIndex).Value
+            If (Nodes(NodeIndex).value > -1) Then
+                Result(ResultLen) = Nodes(NodeIndex).value
                 ResultLen = ResultLen + 1
                 If (ResultLen = lResultLen) Then GoTo DecodeFinished
                 NodeIndex = 0
@@ -435,10 +433,10 @@ Public Sub DecodeByte(ByteArray() As Byte, ByteLen As Long)
 
 DecodeFinished:
     Char = 0
-    For I = 0 To (ResultLen - 1)
-        Char = Char Xor Result(I)
-        If (I Mod 10000 = 0) Then
-            NewProgress = I / ResultLen * PROGRESS_CHECKCRC + PROGRESS_DECODING
+    For i = 0 To (ResultLen - 1)
+        Char = Char Xor Result(i)
+        If (i Mod 10000 = 0) Then
+            NewProgress = i / ResultLen * PROGRESS_CHECKCRC + PROGRESS_DECODING
             If (NewProgress <> CurrProgress) Then
                 CurrProgress = NewProgress
                 RaiseEvent Progress(CurrProgress)
@@ -447,13 +445,13 @@ DecodeFinished:
     Next
     If (Char <> CheckSum) Then Err.Raise vbObjectError, "clsHuffman.Decode()", "The data might be corrupted (checksum did not match expected value)"
     ReDim ByteArray(0 To ResultLen - 1)
-    Call CopyMem(ByteArray(0), Result(0), ResultLen)
+    Call CopyMemory(ByteArray(0), Result(0), ResultLen)
     If (CurrProgress <> 100) Then RaiseEvent Progress(100)
 End Sub
 Private Sub CreateBitSequences(Nodes() As HUFFMANTREE, ByVal NodeIndex As Integer, Bytes As ByteArray, CharValue() As ByteArray)
     Dim NewBytes As ByteArray
-    If (Nodes(NodeIndex).Value > -1) Then
-        CharValue(Nodes(NodeIndex).Value) = Bytes
+    If (Nodes(NodeIndex).value > -1) Then
+        CharValue(Nodes(NodeIndex).value) = Bytes
         Exit Sub
     End If
     If (Nodes(NodeIndex).LeftNode > -1) Then

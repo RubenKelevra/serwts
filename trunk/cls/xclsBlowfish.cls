@@ -27,8 +27,6 @@ Option Explicit
 ' Information on the Blowfish algorithm can be found at:
 ' http://www.counterpane.com/blowfish.html
 
-Private Declare Sub CopyMem Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, Source As Any, ByVal Length As Long)
-
 Event Progress(Percent As Long)
 
 Private Const Rounds = 16
@@ -51,7 +49,6 @@ Private Const k_bytShift2 As Byte = 4
 Private Const k_bytShift4 As Byte = 16
 Private Const k_bytShift6 As Byte = 64
 Private Const k_lMaxBytesPerLine As Long = 152
-Private Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (ByVal Destination As Long, ByVal Source As Long, ByVal Length As Long)
 
 Private Sub Initialize64()
     m_bytIndex(0) = 65 'Asc("A")
@@ -239,7 +236,7 @@ Public Function Encode64(ByRef sInput As String) As String
 End Function
 
 Public Function EncodeArray64(ByRef bytInput() As Byte) As String
-    On Error GoTo ErrorHandler
+    On Error GoTo errorhandler
     
     If m_bytReverseIndex(47) <> 63 Then Initialize64
     Dim bytWorkspace() As Byte, bytResult() As Byte
@@ -312,18 +309,18 @@ Public Function EncodeArray64(ByRef bytInput() As Byte) As String
     End If
     Exit Function
 
-ErrorHandler:
+errorhandler:
     Erase bytResult
     EncodeArray64 = bytResult
 End Function
 
 Private Static Sub DecryptBlock(Xl As Long, Xr As Long)
-    Dim I As Long, J As Long, K As Long
+    Dim i As Long, J As Long, K As Long
     K = Xr
     Xr = Xl Xor m_pBox(Rounds + 1)
     Xl = K Xor m_pBox(Rounds)
     J = Rounds - 2
-    For I = 0 To (Rounds \ 2 - 1)
+    For i = 0 To (Rounds \ 2 - 1)
         Xl = Xl Xor F(Xr)
         Xr = Xr Xor m_pBox(J + 1)
         Xr = Xr Xor F(Xl)
@@ -332,9 +329,9 @@ Private Static Sub DecryptBlock(Xl As Long, Xr As Long)
     Next
 End Sub
 Private Static Sub EncryptBlock(Xl As Long, Xr As Long)
-    Dim I As Long, J As Long, Temp As Long
+    Dim i As Long, J As Long, Temp As Long
     J = 0
-    For I = 0 To (Rounds \ 2 - 1)
+    For i = 0 To (Rounds \ 2 - 1)
         Xl = Xl Xor m_pBox(J)
         Xr = Xr Xor F(Xl)
         Xr = Xr Xor m_pBox(J + 1)
@@ -352,11 +349,11 @@ Public Sub EncryptByte(ByteArray() As Byte, Optional Key As String)
     CipherLen = OrigLen + 12
     If (CipherLen Mod 8 <> 0) Then CipherLen = CipherLen + 8 - (CipherLen Mod 8)
     ReDim Preserve ByteArray(CipherLen - 1)
-    Call CopyMem(ByteArray(12), ByteArray(0), OrigLen)
-    Call CopyMem(ByteArray(8), OrigLen, 4)
+    Call CopyMemory(ByteArray(12), ByteArray(0), OrigLen)
+    Call CopyMemory(ByteArray(8), OrigLen, 4)
     Call Randomize
-    Call CopyMem(ByteArray(0), CLng(2147483647 * Rnd), 4)
-    Call CopyMem(ByteArray(4), CLng(2147483647 * Rnd), 4)
+    Call CopyMemory(ByteArray(0), CLng(2147483647 * Rnd), 4)
+    Call CopyMemory(ByteArray(4), CLng(2147483647 * Rnd), 4)
     For Offset = 0 To (CipherLen - 1) Step 8
         Call GetWord(LeftWord, ByteArray(), Offset)
         Call GetWord(RightWord, ByteArray(), Offset + 4)
@@ -392,7 +389,7 @@ Public Function DecryptString(Text As String, Optional Key As String, Optional I
     Erase ByteArray(): Key = "": Text = ""
 End Function
 Public Sub DecryptByte(ByteArray() As Byte, Optional Key As String)
-    On Error GoTo ErrorHandler
+    On Error GoTo errorhandler
     Dim Offset As Long, OrigLen As Long, LeftWord As Long, RightWord As Long, CipherLen As Long, CipherLeft As Long, CipherRight As Long, CurrPercent As Long, NextPercent As Long
     If (Len(Key) > 0) Then Me.Key = Key
     CipherLen = UBound(ByteArray) + 1
@@ -412,17 +409,17 @@ Public Sub DecryptByte(ByteArray() As Byte, Optional Key As String)
             RaiseEvent Progress(CurrPercent)
         End If
     Next
-    Call CopyMem(OrigLen, ByteArray(8), 4)
+    Call CopyMemory(OrigLen, ByteArray(8), 4)
     If (CipherLen - OrigLen > 19) Or (CipherLen - OrigLen < 12) Then Call Err.Raise(vbObjectError, , "Incorrect size descriptor in Blowfish decryption")
-    Call CopyMem(ByteArray(0), ByteArray(12), OrigLen)
+    Call CopyMemory(ByteArray(0), ByteArray(12), OrigLen)
     ReDim Preserve ByteArray(OrigLen - 1)
     If CurrPercent <> 100 Then RaiseEvent Progress(100)
 
-ErrorHandler:
+errorhandler:
 End Sub
 Private Static Function F(ByVal X As Long) As Long
     Dim xb(0 To 3) As Byte
-    Call CopyMem(xb(0), X, 4)
+    Call CopyMemory(xb(0), X, 4)
     If (m_RunningCompiled) Then F = (((m_sBox(0, xb(3)) + m_sBox(1, xb(2))) Xor m_sBox(2, xb(1))) + m_sBox(3, xb(0))) Else F = UnsignedAdd((UnsignedAdd(m_sBox(0, xb(3)), m_sBox(1, xb(2))) Xor m_sBox(2, xb(1))), m_sBox(3, xb(0)))
 End Function
 Private Static Sub GetWord(LongValue As Long, CryptBuffer() As Byte, Offset As Long)
@@ -431,75 +428,75 @@ Private Static Sub GetWord(LongValue As Long, CryptBuffer() As Byte, Offset As L
     bb(2) = CryptBuffer(Offset + 1)
     bb(1) = CryptBuffer(Offset + 2)
     bb(0) = CryptBuffer(Offset + 3)
-    Call CopyMem(LongValue, bb(0), 4)
+    Call CopyMemory(LongValue, bb(0), 4)
 End Sub
 Private Static Sub PutWord(LongValue As Long, CryptBuffer() As Byte, Offset As Long)
     Dim bb(0 To 3) As Byte
-    Call CopyMem(bb(0), LongValue, 4)
+    Call CopyMemory(bb(0), LongValue, 4)
     CryptBuffer(Offset) = bb(3)
     CryptBuffer(Offset + 1) = bb(2)
     CryptBuffer(Offset + 2) = bb(1)
     CryptBuffer(Offset + 3) = bb(0)
 End Sub
 Private Static Function UnsignedAdd(ByVal Data1 As Long, Data2 As Long) As Long
-    Dim x1(0 To 3) As Byte, x2(0 To 3) As Byte, xx(0 To 3) As Byte, Rest As Long, Value As Long, A As Long
-    Call CopyMem(x1(0), Data1, 4)
-    Call CopyMem(x2(0), Data2, 4)
+    Dim x1(0 To 3) As Byte, x2(0 To 3) As Byte, xx(0 To 3) As Byte, Rest As Long, value As Long, A As Long
+    Call CopyMemory(x1(0), Data1, 4)
+    Call CopyMemory(x2(0), Data2, 4)
     Rest = 0
     For A = 0 To 3
-        Value = CLng(x1(A)) + CLng(x2(A)) + Rest
-        xx(A) = Value And 255
-        Rest = Value \ 256
+        value = CLng(x1(A)) + CLng(x2(A)) + Rest
+        xx(A) = value And 255
+        Rest = value \ 256
     Next
-    Call CopyMem(UnsignedAdd, xx(0), 4)
+    Call CopyMemory(UnsignedAdd, xx(0), 4)
 End Function
 Private Function UnsignedDel(Data1 As Long, Data2 As Long) As Long
-    Dim x1(0 To 3) As Byte, x2(0 To 3) As Byte, xx(0 To 3) As Byte, Rest As Long, Value As Long, A As Long
-    Call CopyMem(x1(0), Data1, 4)
-    Call CopyMem(x2(0), Data2, 4)
-    Call CopyMem(xx(0), UnsignedDel, 4)
+    Dim x1(0 To 3) As Byte, x2(0 To 3) As Byte, xx(0 To 3) As Byte, Rest As Long, value As Long, A As Long
+    Call CopyMemory(x1(0), Data1, 4)
+    Call CopyMemory(x2(0), Data2, 4)
+    Call CopyMemory(xx(0), UnsignedDel, 4)
     For A = 0 To 3
-        Value = CLng(x1(A)) - CLng(x2(A)) - Rest
-        If (Value < 0) Then
-            Value = Value + 256
+        value = CLng(x1(A)) - CLng(x2(A)) - Rest
+        If (value < 0) Then
+            value = value + 256
             Rest = 1
         Else
             Rest = 0
         End If
-        xx(A) = Value
+        xx(A) = value
     Next
-    Call CopyMem(UnsignedDel, xx(0), 4)
+    Call CopyMemory(UnsignedDel, xx(0), 4)
 End Function
 Public Property Let Key(New_Value As String)
-    Dim I As Long, J As Long, K As Long, dataX As Long, datal As Long, datar As Long, Key() As Byte, KeyLength As Long
+    Dim i As Long, J As Long, K As Long, dataX As Long, datal As Long, datar As Long, Key() As Byte, KeyLength As Long
     Class_Initialize
     If (m_KeyValue = New_Value) Then Exit Property
     m_KeyValue = New_Value
     KeyLength = Len(New_Value)
     Key() = StrConv(New_Value, vbFromUnicode)
     J = 0
-    For I = 0 To (Rounds + 1)
+    For i = 0 To (Rounds + 1)
         dataX = 0
         For K = 0 To 3
-            Call CopyMem(ByVal VarPtr(dataX) + 1, dataX, 3)
+            Call CopyMemory(ByVal VarPtr(dataX) + 1, dataX, 3)
             dataX = (dataX Or Key(J))
             J = J + 1
             If (J >= KeyLength) Then J = 0
         Next
-        m_pBox(I) = m_pBox(I) Xor dataX
+        m_pBox(i) = m_pBox(i) Xor dataX
     Next
     
     datal = 0: datar = 0
-    For I = 0 To (Rounds + 1) Step 2
+    For i = 0 To (Rounds + 1) Step 2
         Call EncryptBlock(datal, datar)
-        m_pBox(I) = datal
-        m_pBox(I + 1) = datar
+        m_pBox(i) = datal
+        m_pBox(i + 1) = datar
     Next
-    For I = 0 To 3
+    For i = 0 To 3
         For J = 0 To 255 Step 2
             Call EncryptBlock(datal, datar)
-            m_sBox(I, J) = datal
-            m_sBox(I, J + 1) = datar
+            m_sBox(i, J) = datal
+            m_sBox(i, J + 1) = datar
         Next
     Next
 End Property
@@ -1582,12 +1579,12 @@ Public Function EncryptFile(InFile As String, OutFile As String, Overwrite As Bo
     Erase Buffer(): Key = "": InFile = "": OutFile = ""
     Exit Function
 
-ErrorHandler:
+errorhandler:
     Erase Buffer(): Key = "": InFile = "": OutFile = ""
     EncryptFile = False
 End Function
 Public Function DecryptFile(InFile As String, OutFile As String, Overwrite As Boolean, Optional Key As String, Optional IsFileIn64 As Boolean) As Boolean
-    On Error GoTo ErrorHandler
+    On Error GoTo errorhandler
     If FileExist(InFile) = False Then
         DecryptFile = False
         Exit Function
@@ -1612,16 +1609,16 @@ Public Function DecryptFile(InFile As String, OutFile As String, Overwrite As Bo
     Erase Buffer(): Key = "": InFile = "": OutFile = ""
     Exit Function
 
-ErrorHandler:
+errorhandler:
     Erase Buffer(): Key = "": InFile = "": OutFile = ""
     DecryptFile = False
 End Function
 Private Function FileExist(FilePath As String) As Boolean
-    On Error GoTo ErrorHandler
+    On Error GoTo errorhandler
     Call FileLen(FilePath)
     FileExist = True
     Exit Function
 
-ErrorHandler:
+errorhandler:
     FileExist = False
 End Function

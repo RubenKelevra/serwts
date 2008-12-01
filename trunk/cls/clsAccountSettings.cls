@@ -21,12 +21,14 @@ Public mstrPassword As String
 Public mstrMboxPath As String
 Public mdtmLastFetch As Date
 Public mblnForceSecuredAuthorisation As Boolean
+Private maintMBoxes() As Long
 
 Public Sub saveData(ByRef index As Integer, ByRef Data As String)
     'Public saveData
     'sets various values
     ' - [IN] ByRef index As Integer: the index of information which is given
     ' - [IN] ByRef data As String: the information which should be stored
+    Dim str() As String
     Select Case index
         Case 0 'Account name
             mstrAccountName = Data
@@ -52,10 +54,12 @@ Public Sub saveData(ByRef index As Integer, ByRef Data As String)
             If getVarType(Data) = 4 Or getVarType(Data) = 5 Or getVarType(Data) = 98 Then
                 mdtmLastFetch = CDate(Data)
             Else
-                mdtmLastFetch = Nothing
+                mdtmLastFetch = 0
             End If
         Case 7 'force secured authorisation
             mblnForceSecuredAuthorisation = CBool(Data)
+        Case 8 'MBox filenames
+            str = Split(Data, ";")
         Case Else
     End Select
 End Sub
