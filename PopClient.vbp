@@ -19,6 +19,7 @@ Class=xclsMD5; cls\xclsMD5.cls
 Module=modConstants; mod\modConstants.bas
 Module=modGetVarType; mod\modGetVarType.bas
 Module=xmodFileOperations; mod\xmodFileOperations.bas
+Module=modGlobalErrorCodes; mod\modGlobalErrorCodes.bas
 IconForm="frmLogin"
 Startup="frmMain"
 HelpFile=""
