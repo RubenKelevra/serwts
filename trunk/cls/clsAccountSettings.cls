@@ -21,7 +21,9 @@ Public mstrPassword As String
 Public mstrMboxPath As String
 Public mdtmLastFetch As Date
 Public mblnForceSecuredAuthorisation As Boolean
-Private maintMBoxes() As Long
+'FIXME: this need get/set functions
+Private maMBoxes() As clsMBox
+Private i As Integer
 
 Public Sub saveData(ByRef index As Integer, ByRef Data As String)
     'Public saveData
@@ -60,6 +62,22 @@ Public Sub saveData(ByRef index As Integer, ByRef Data As String)
             mblnForceSecuredAuthorisation = CBool(Data)
         Case 8 'MBox filenames
             str = Split(Data, ";")
+            For i = LBound(str) To UBound(str) - LBound(str) Step 3
+                Call AddSubbox(CInt(str(i)), str(i + 1), CInt(str(i + 2)))
+            Next i
         Case Else
     End Select
 End Sub
+
+Private Function AddSubbox(Parent As Integer, ByRef Selfname As String, selfno As Integer)
+    
+End Function
+
+Public Function insertSubbox(Parent As Integer, ByRef Selfname As String) As Integer
+    'Public insertSubbox As Integer
+    'is used to add a subfolder mbox to the given folder
+    ' - [IN] Parent As Integer: gives the ID from the parentfolder
+    ' - [IN] Selfname As String: labels the new folder
+    ' - returns the new ID of the folder, if not possible it will return 0
+    
+End Function
