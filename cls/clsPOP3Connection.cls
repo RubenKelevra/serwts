@@ -41,7 +41,7 @@ Private Sub clearMailData()
     Length = -1
     ID = -1
     Mail = ""
-    UIDL = ""
+    UID = ""
 End Sub
 
 Public Function Create(ByRef Pass As String, ByRef User As String, ByRef wskNetworkSocket As Winsock, ByRef strServerAddress As String, intPort As Integer, blnSecureAuthorisation) As Integer
@@ -216,7 +216,7 @@ Private Function login() As Integer
         End If
         
         On Error GoTo SendDataError
-        Call .SendData("USER " & mstrUser)
+        Call .SendData("USER " & mstrUser & vbCrLf)
         i = getIncommingData(mstrTempIncommingData)
         If Not Left$(mstrTempIncommingData, 3) = "+OK" Then
             login = Error.PopUserNotFound
@@ -230,9 +230,9 @@ Private Function login() As Integer
             login = Error.PopAPOPNotSupported
             Exit Function
         ElseIf mstrLoginTime = "" Then
-            Call .SendData("PASS " & mstrPassword)
+            Call .SendData("PASS " & mstrPassword & vbCrLf)
         Else
-            Call .SendData("PASS " & mMD5.sum(mstrLoginTime & mstrPassword & vbNullChar))
+            Call .SendData("PASS " & mMD5.sum(mstrLoginTime & mstrPassword & vbNullChar) & vbCrLf)
         End If
         
         i = getIncommingData(mstrTempIncommingData)
@@ -248,6 +248,7 @@ Private Function login() As Integer
     End With
     
     login = Error.Success
+    Exit Function
     
 SendDataError:
             On Error GoTo 0
@@ -287,7 +288,7 @@ Public Function getMail(Number As Integer) As Integer
     End If
 End Function
 
-Public Function getMail2(Number As Integer) As Integer
+Public Function getMailUID(Number As Integer) As Integer
     If Not configured Then
         checkSecureAuthorisation = Error.NotConfigured
         Exit Function
