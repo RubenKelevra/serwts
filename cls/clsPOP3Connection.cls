@@ -287,7 +287,7 @@ Public Function getMail(Number As Integer) As Integer
     End If
 End Function
 
-Public Function getMail(Number As Integer) As Integer
+Public Function getMail2(Number As Integer) As Integer
     If Not configured Then
         checkSecureAuthorisation = Error.NotConfigured
         Exit Function

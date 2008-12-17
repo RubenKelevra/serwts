@@ -169,7 +169,7 @@ Private Function splitheader(ByRef sheader As String) As Integer
     sDate = sTeilstring(2)
 End Function
 
-Private Function buildheaderline(ByRef sheader As String)
+Private Function buildseperator(ByRef sheader As String) As Integer
     'look for the Fromline and the next line
     'then take both lines in one string for example : From c@d.com date
     Dim FromLine As String
@@ -187,8 +187,40 @@ Private Function buildheaderline(ByRef sheader As String)
     'example : wed, 26 Nov 2008 07:58:08 +0100
     
     HeaderLine = "From " & FromLine & DateLine
+    
 
 End Function
+Private Function getsubject(ByRef sheader) As String
+    
+
+End Function
+Private Function getdate(ByRef sheader) As String
+    'DateLine reading
+    Pos1 = InStr(1, sheader, "DATE:")
+    DateLine = Mid(sheader, Pos1 + 5, vbCrLf)
+    'example : wed, 26 Nov 2008 07:58:08 +0100
+
+End Function
+Private Function getAddyFrom() As String
+    'FromLine reading
+    Pos1 = InStr(1, sheader, "FROM:")
+    FromLine = Mid(sheader, Pos1 + 5, vbCrLf)
+    'example : root <root@arktur.btr-rs.local>
+End Function
+Private Function getAddyTo() As String
+    
+End Function
+Public Function getMailInfo(detailed As Boolean) As String()
+'1.Subject
+'2.AddyFrom
+'3.Date
+'If detailed = true then
+'4.AddyTo
+'5.Content Type:
+
+
+End Function
+
 
 Private Function saveEmailtoMbox(ByRef HeaderLine As String, Header As String, Body As String, path As String, Filename As String) As Integer
     'funtion saveEmailtoMbox(fromline, Header, Body, path, Filename) as integer
