@@ -1,4 +1,5 @@
 VERSION 5.00
+Object = "{248DD890-BB45-11CF-9ABC-0080C7E7B78D}#1.0#0"; "MSWINSCK.OCX"
 Object = "{831FDD16-0C5C-11D2-A9FC-0000F8754DA1}#2.0#0"; "MSCOMCTL.OCX"
 Begin VB.Form frmMain 
    Caption         =   "Pop-Client"
@@ -10,6 +11,13 @@ Begin VB.Form frmMain
    ScaleHeight     =   4050
    ScaleWidth      =   7935
    StartUpPosition =   3  'Windows-Standard
+   Begin MSWinsockLib.Winsock wskMain 
+      Left            =   480
+      Top             =   1440
+      _ExtentX        =   741
+      _ExtentY        =   741
+      _Version        =   393216
+   End
    Begin VB.CommandButton Command1 
       Caption         =   "Command1"
       Height          =   375
@@ -61,8 +69,16 @@ Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 
-Private Sub Command1_Click()
+Dim POP3Conn As clsPOP3Connection
 
+
+Private Sub Command1_Click()
+    Dim str() As String
+    Set POP3Conn = New clsPOP3Connection
+    
+    Call POP3Conn.Create("pop3", "ci73gruppe4", wskMain, "arktur", 110, True)
+    Call POP3Conn.getMailheaders(str)
+    
 End Sub
 
 Private Sub Form_Load()

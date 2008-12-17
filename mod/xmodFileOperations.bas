@@ -1,6 +1,9 @@
 Attribute VB_Name = "xmodFileOperations"
 Option Explicit
  
+'Sleep API call
+Public Declare Sub Sleep Lib "kernel32" (ByVal lngMilliseconds As Long)
+ 
 'DLL call to create a path recursive, and check on low level if path exists
 Public Declare Function createDir _
  Lib "imagehlp.dll" (ByVal lpPath As String) As Long
