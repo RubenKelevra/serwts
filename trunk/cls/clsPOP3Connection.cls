@@ -26,7 +26,7 @@ Private mstrUser As String
 Private mstrLoginTime As String 'for APOP command, if not set there's no APOP capability
 Private mstrTempIncommingData As String 'saves temporary the incomming data
 Public Mail As String
-Public UIDL As String
+Public UID As String
 Public Length As Long
 Public ID As Long
 
@@ -267,7 +267,7 @@ Private Function getIncommingData(ByRef IncommingData As String) As Integer
         i = i + 10
         'call Sleep (10)
     Wend
-    Error.Success
+    getIncommingData = Error.Success
     Call mwskNetworkSocket.GetData(IncommingData)
 End Function
 
@@ -280,7 +280,14 @@ Public Function getMailheaders(ByRef Output() As String) As Integer
     getMailheaders = login
 End Function
 
-Public Function getMail(Number As Integer, ByRef Output As String) As Integer
+Public Function getMail(Number As Integer) As Integer
+    If Not configured Then
+        checkSecureAuthorisation = Error.NotConfigured
+        Exit Function
+    End If
+End Function
+
+Public Function getMail(Number As Integer) As Integer
     If Not configured Then
         checkSecureAuthorisation = Error.NotConfigured
         Exit Function
