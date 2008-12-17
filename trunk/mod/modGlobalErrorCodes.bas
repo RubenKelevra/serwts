@@ -11,4 +11,19 @@ Public Enum Error
     NotConfigured = 2
     WskConf = 3
     WskConnect = 4
+    WskClosingTout = 5
+    WskClosingError = 6
+    WskConnectingTout = 7
+    WskConnectionRefused = 8
+    WskConnectionReset = 9
+    WskHostNotFound = 10
+    WskNetworkUnreachable = 11
+    WskNetworkSubsystemFailed = 12
+    WskConnectingFailed = 13
+    WskSendDataError = 14
+    PopCommunicationError = 15
+    WskCommunicationTout = 16
+    PopUserNotFound = 17
+    PopAPOPNotSupported = 18
+    PopPasswordNotCorrect
 End Enum

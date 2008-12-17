@@ -342,8 +342,8 @@ Public Sub addAccountSettings(ByRef Accountname As String, ByRef POP3Server As S
     Call SaveConfig
 End Sub
 
-Public Function mailFetched(ByRef index As Long) As Boolean
-    'Public mailFetched As Boolean
+Private Function mailFetched(ByRef index As Long) As Boolean
+    'Private mailFetched As Boolean
     'renew date/time of the given mail account
     ' - [IN] ByRef index As Long: index of the mail account
     ' - returns true if everything is ok
@@ -491,11 +491,11 @@ Private Function getMailDir(ByRef MboxPath As String, ByRef Accountname As Strin
     End If
 End Function
 
-Private Function closeMBox(ByRef index As Long)
+Private Function closeMbox(ByRef index As Long)
     
 End Function
 
-Private Function openMBox(ByRef index As Long)
+Private Function openMbox(ByRef index As Long)
     
 End Function
 
@@ -524,7 +524,7 @@ Private Function moveMbox(ByRef index As Long, ByRef newPath As String, ByRef ne
         Exit Function
     End If
     
-    Call closeMBox(index)
+    Call closeMbox(index)
     For Each mboxfile In getMboxFiles(index)
         If Not FileExists(sourceDirectory & mboxfile) Then
             Call Err.Raise(vbObjectError, , "Error mboxfile " & mboxfile & " couldn't be found")
@@ -559,7 +559,7 @@ sourcefiledeleteerror:
 End Function
 
 Private Function getMboxFiles(ByRef index As Long) As String()
-
+    
 End Function
 
 Public Function changeMboxPath(ByRef index As Long, ByRef newPath As String) As Boolean

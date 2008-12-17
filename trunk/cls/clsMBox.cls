@@ -92,7 +92,11 @@ Public Function closeMBox() As Boolean
     End If
 End Function
 
+<<<<<<< .mine
+Public Function openMbox(ByRef Path As String, ByRef Label As String) As Boolean
+=======
 Public Function openMBox(ByRef Path As String, ByRef label As String) As Integer
+>>>>>>> .r22
     'this function should open the mbox with the given laben in the given path
     Open Path & label For Random As #mintFnum
 End Function
@@ -108,11 +112,11 @@ Close #mintFnum
     
 End Function
 
-Private Function calcFilename(ByRef label As String) As String
+Private Function calcFilename(ByRef Label As String) As String
     'Private calcFilename As String
     ' - [IN] ByRef Filename As String: label of the mbox
     ' - returns the "encrypted" filename for our mbox
-    calcFilename = mMD5.sum(mSHA256.sum(label))
+    calcFilename = mMD5.sum(mSHA256.sum(Label))
 End Function
 
 'what wasn´t ready?

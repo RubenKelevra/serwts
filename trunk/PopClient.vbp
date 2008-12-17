@@ -20,6 +20,7 @@ Module=modConstants; mod\modConstants.bas
 Module=modGetVarType; mod\modGetVarType.bas
 Module=xmodFileOperations; mod\xmodFileOperations.bas
 Module=modGlobalErrorCodes; mod\modGlobalErrorCodes.bas
+Module=modStrFunctions; mod\modStrFunctions.bas
 IconForm="frmLogin"
 Startup="frmMain"
 HelpFile=""

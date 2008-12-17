@@ -15,12 +15,20 @@ Option Explicit
 
 'Handles one POP3 Connection for Emailfetching
 
-Dim mMD5 As xclsMD5 'used for APOP-command
-Dim mwskNetworkSocket As Winsock
-Dim mstrServerAddress As String
-Dim mintPort As Integer
-Dim mblnSecureAuthorisation As Boolean
-Dim mblnConfigured As Boolean
+Private mMD5 As xclsMD5 'used for APOP-command
+Private mwskNetworkSocket As Winsock
+Private mstrServerAddress As String
+Private mintPort As Integer
+Private mblnSecureAuthorisation As Boolean
+Private mblnConfigured As Boolean
+Private mstrPassword As String
+Private mstrUser As String
+Private mstrLoginTime As String 'for APOP command, if not set there's no APOP capability
+Private mstrTempIncommingData As String 'saves temporary the incomming data
+Public Mail As String
+Public UIDL As String
+Public Length As Long
+Public ID As Long
 
 Private Sub Class_Initialize()
     'Private Class_Initialize
@@ -29,13 +37,23 @@ Private Sub Class_Initialize()
     mblnConfigured = False
 End Sub
 
-Public Function create(ByRef wskNetworkSocket As Winsock, ByRef strServerAddress As String, intPort As Integer, blnSecureAuthorisation) As Integer
+Private Sub clearMailData()
+    Length = -1
+    ID = -1
+    Mail = ""
+    UIDL = ""
+End Sub
+
+Public Function Create(ByRef Pass As String, ByRef User As String, ByRef wskNetworkSocket As Winsock, ByRef strServerAddress As String, intPort As Integer, blnSecureAuthorisation) As Integer
+    mstrPassword = Pass
+    mstrUser = User
     Set mwskNetworkSocket = wskNetworkSocket
     mstrServerAddress = strServerAddress
     mintPort = intPort
     mblnSecureAuthorisation = blnSecureAuthorisation
     mblnConfigured = True
-    create = Error.Success
+    Call clearMailData
+    Create = Error.Success
 End Function
 
 Private Function configured() As Boolean
@@ -48,7 +66,7 @@ Public Function secureAuthorisation(Optional value As Object) As Integer
     ' - [IN] Optional Value As Object: if set it will override the state
     ' - will return the current setting, furthermore it will return the Value state if set
     If Not configured Then
-        checkSecureAuthorisation = Error.NotConfigured
+        secureAuthorisation = Error.NotConfigured
         Exit Function
     End If
     If IsMissing(value) Then
@@ -62,14 +80,13 @@ End Function
 Private Function WskSetup() As Boolean
     On Error GoTo WskSetupError
     With mwskNetworkSocket
-        Call .Close
-        .BytesReceived = 0
         .RemoteHost = mstrServerAddress
         .RemotePort = mintPort
         .Protocol = sckTCPProtocol
     End With
     On Error GoTo 0
     WskSetup = True
+    Exit Function
     
 WskSetupError:
     On Error GoTo 0
@@ -101,21 +118,166 @@ Public Function checkSecureAuthorisation() As Integer
     End If
     
     If Not WskSetup Then
-        checkSecureAuthorisation = Error.ErrorWskConf
+        checkSecureAuthorisation = Error.WskConf
     End If
     If Not WskConnect Then
         checkSecureAuthorisation = Error.WskConnect
     End If
+End Function
+
+Private Function login() As Integer
+    Dim i As Integer
+    If Not configured Then
+        login = Error.NotConfigured
+        Exit Function
+    End If
     
+    If Not WskSetup Then
+        login = Error.WskConf
+        Exit Function
+    End If
     
+    With mwskNetworkSocket
+        'if connection not closed, we'll close it hardly
+        If Not .State = sckClosed Then
+            Call .Close
+            i = 0
+            'checking if connection is closed
+            While .State = sckClosing
+                If i > SckToutClosing Then
+                    login = Error.WskClosingTout
+                    Exit Function
+                End If
+                i = i + 10
+                'Call Sleep(10)
+            Wend
+        End If
         
+        'now the connection should be in closed state
+        If Not .State = sckClosed Then
+            login = Error.WskClosingError
+            Exit Function
+        End If
+        
+        'we going to connect to Server
+        Call .Connect
+        DoEvents
+        i = 0
+        While .State = sckConnecting
+            If i > SckToutConnecting Then
+                login = Error.WskConnectingTout
+                Exit Function
+            End If
+            i = i + 10
+            'Call Sleep(10)
+        Wend
+        
+        'now the connection should be in connected state
+        If Not .State = sckConnected Then
+            Select Case .State
+                Case sckConnectionRefused
+                    login = Error.WskConnectionRefused
+                Case sckConnectionReset
+                    login = Error.WskConnectionReset
+                Case sckHostNotFound
+                    login = Error.WskHostNotFound
+                Case sckNetworkUnreachable
+                    login = Error.WskNetworkUnreachable
+                Case sckNetworkSubsystemFailed
+                    login = Error.WskNetworkSubsystemFailed
+                Case Else
+                    login = Error.WskConnectingFailed
+            End Select
+            Exit Function
+        End If
+        
+        'send login, save logintime (for APOP) if present
+        
+        i = getIncommingData(mstrTempIncommingData)
+        'if we don't get an ok, we abort
+        If Not Left$(mstrTempIncommingData, 3) = "+OK" Then
+            login = Error.PopCommunicationError
+            Exit Function
+        ElseIf i = Error.WskCommunicationTout Then
+            login = Error.WskCommunicationTout
+            Exit Function
+        End If
+        
+        mstrLoginTime = "<" + Split(mstrTempIncommingData, "<")(1)
+        
+        'check syntax
+        
+        If FindFirstOf(mstrLoginTime, "<") + 1 = FindLastOf(mstrLoginTime, ">") Then
+            'no date given
+            mstrLoginTime = ""
+        ElseIf FindLastOf(mstrLoginTime, ">") = -1 Then
+            'no date given
+            mstrLoginTime = ""
+        End If
+        
+        On Error GoTo SendDataError
+        Call .SendData("USER " & mstrUser)
+        i = getIncommingData(mstrTempIncommingData)
+        If Not Left$(mstrTempIncommingData, 3) = "+OK" Then
+            login = Error.PopUserNotFound
+            Exit Function
+        ElseIf i = Error.WskCommunicationTout Then
+            login = Error.WskCommunicationTout
+            Exit Function
+        End If
+        
+        If mstrLoginTime = "" And mblnSecureAuthorisation Then
+            login = Error.PopAPOPNotSupported
+            Exit Function
+        ElseIf mstrLoginTime = "" Then
+            Call .SendData("PASS " & mstrPassword)
+        Else
+            Call .SendData("PASS " & mMD5.sum(mstrLoginTime & mstrPassword & vbNullChar))
+        End If
+        
+        i = getIncommingData(mstrTempIncommingData)
+        If Not Left$(mstrTempIncommingData, 3) = "+OK" Then
+            login = Error.PopPasswordNotCorrect
+            Exit Function
+        ElseIf i = Error.WskCommunicationTout Then
+            login = Error.WskCommunicationTout
+            Exit Function
+        End If
+        
+        On Error GoTo 0
+    End With
+    
+    login = Error.Success
+    
+SendDataError:
+            On Error GoTo 0
+            login = Error.WskSendDataError
+            Exit Function
+End Function
+
+Private Function getIncommingData(ByRef IncommingData As String) As Integer
+    Dim i As Integer
+    
+    i = 0
+    While mwskNetworkSocket.BytesReceived = 0
+        If i > SckToutData Then
+            getIncommingData = Error.WskCommunicationTout
+            Exit Function
+        End If
+        i = i + 10
+        'call Sleep (10)
+    Wend
+    Error.Success
+    Call mwskNetworkSocket.GetData(IncommingData)
 End Function
 
 Public Function getMailheaders(ByRef Output() As String) As Integer
     If Not configured Then
-        checkSecureAuthorisation = Error.NotConfigured
+        getMailheaders = Error.NotConfigured
         Exit Function
     End If
+    
+    getMailheaders = login
 End Function
 
 Public Function getMail(Number As Integer, ByRef Output As String) As Integer
