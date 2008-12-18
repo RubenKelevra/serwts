@@ -494,30 +494,22 @@ Private Sub wskMain_DataArrival(ByVal bytesTotal As Long)
                     Call .SendData("QUIT" & vbCrLf)
                 ElseIf isOK(ArrivedData) Then
                     iArg = getNumbers(ArrivedData)
-                    If Not UBound(iArg) - LBound(iArg) = 1 Then GoTo staterr
+                    If Not UBound(iArg) - LBound(iArg) = 1 Then GoTo staterr 'not (only) two numbers were sended by the server
                     
                     If Not iArg(0) = 0 Then 'there are emails which we going to fetch
-                        Select Case currentPOP3Task
-                            Case POP3TaskCode.getEmailHeaders
-                            Case POP3TaskCode.getNewEmailHeaders_Wuid
-                            Case POP3TaskCode.getNewEmailHeaders_WOuid
-                            Case POP3TaskCode.getOneEmail_Wuid_Wdelete
-                            Case POP3TaskCode.getOneEmail_WOuid_Wdelete
-                            Case POP3TaskCode.getOneEmail_Wuid_WOdelete
-                            Case POP3TaskCode.getOneEmail_WOuid_WOdelete
-                            Case POP3TaskCode.deleteEmail_Wuid
-                            Case POP3TaskCode.deleteEmail_WOuid
-                            Case POP3TaskCode.getAllEmails_Wuid_deleteALL
-                            Case POP3TaskCode.getAllEmails_WOuid_deleteALL
-                            Case POP3TaskCode.getAllEmails_Wuid_NOdelete
-                            Case POP3TaskCode.getAllEmails_WOuid_NOdelete
-                            Case POP3TaskCode.getAllEmails_Wuid_deleteFETCHED
-                            Case POP3TaskCode.getAllEMails_WOuid_deleteFETCHED
-                        End Select
+                        If Not (currentPOP3Task = POP3TaskCode.checkAPOPCapability Or currentPOP3Task = POP3TaskCode.NoTask) Then
+                            currentPOP3Task = POP3Stat.awaitingListOK
+                            Call .SendData("LIST" & vbCrLf)
+                        Else
+                            currentPOP3Task = POP3TaskCode.NoTask
+                            currentNetworkStatus = POP3Stat.awaitingQuitOK
+                            Call .SendData("QUIT" & vbCrLf)
+                        End If
                     Else 'there is nothing to do
+                        Call errorhandler(Error.PopNoEmailsInAccount)
                         currentPOP3Task = POP3TaskCode.NoTask
                         currentNetworkStatus = POP3Stat.awaitingQuitOK
-                        .SendData ("QUIT" & vbCrLf)
+                        Call .SendData("QUIT" & vbCrLf)
                     End If
                 Else '-ERR'
 staterr:
@@ -529,6 +521,16 @@ staterr:
                     'trying to handle it with list
                 End If
             Case POP3Stat.awaitingListOK
+                'fixme if is wrong
+                If 3 <= currentPOP3Task And currentPOP3Task <= 9 Then 'is with UID
+                    currentNetworkStatus = POP3Stat.awaitingUidlOK
+                    Call .SendData("UIDL" & vbCrLf)
+                ElseIf (10 <= currentPOP3Task And currentPOP3Task <= 16) Or currentNetworkStatus = 2 Then 'without UID or without restrictions
+                    currentpop3 = POP3Stat.awaitingListOK
+                    .SendData ("LIST" & vbCrLf)
+                End If
+                        
+                        
                 Select Case currentPOP3Task
                     Case POP3TaskCode.NoTask
                         currentNetworkStatus = POP3Stat.awaitingQuitOK
