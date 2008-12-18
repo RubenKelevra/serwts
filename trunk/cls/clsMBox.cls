@@ -69,12 +69,12 @@ Public Function renameMBox(ByRef newName As String) As Boolean
     
     End Function
 'ready
-Private Function openHandle(create As Boolean) As Boolean
+Private Function openHandle(Create As Boolean) As Boolean
     'Private openMBox As Boolean
     'Open filehandle to MBox
     ' - returns true if this was ok
     If Not mblnMboxOpen Then
-        If Not FileExists(mstrMboxPath & mstrMboxFileName) And Not create Then
+        If Not FileExists(mstrMboxPath & mstrMboxFileName) And Not Create Then
             Call Err.Raise(vbObjectError, , "MBox couldn't be found: '" & mstrMboxPath & mstrMboxFileName & "'")
             Exit Function
         End If
@@ -109,7 +109,7 @@ Public Function createMbox(ByRef path As String, ByRef Filename As String) As In
     'false if there is already an mbox or the file could not be created
     mstrMboxPath = path
     mstrMboxFileName = Filename
-    mstrMboxFileName = filename
+    mstrMboxFileName = Filename
     
     If openHandle(True) Then
     If openHandle Then
@@ -157,7 +157,7 @@ Public Function GetHeaderInfos() As String()
 
 End Function
 
-Private Function GetHeaderInfo(ByRef sHeader As String, ByRef Output() As String, detailed As Boolean) As Integer
+Private Function GetHeaderInfo(ByRef sheader As String, ByRef Output() As String, detailed As Boolean) As Integer
     'Private SplitHeader as Integer
     'This function splits the mail/header into lines and try to find FROM, DATE, SUBJECT or if detailed is true: FROM, DATE, SUBJECT, TO-ADDRESS, CONTENT-TYPE
     ' - [IN] ByRef sHeader As String: the input mail/header
@@ -180,10 +180,10 @@ Private Function splitheader(ByRef sheaderline As String) As Integer
     'Split the Header in From, Absender, Betreff, Datum
     
     'check if it's CRLF or valid LF
-    If Not vbCr = Mid(sHeader, InStr(sHeader, vbLf) - 1, 1) Then 'it's valid LF
-        sPerLineHeader = Split(sHeader, vbLf)
+    If Not vbCr = Mid(sheader, InStr(sheader, vbLf) - 1, 1) Then 'it's valid LF
+        sPerLineHeader = Split(sheader, vbLf)
     Else 'this is crappy CRLF
-        sPerLineHeader = Split(sHeader, vbCrLf)
+        sPerLineHeader = Split(sheader, vbCrLf)
     End If
     
     If detailed Then
@@ -218,7 +218,7 @@ Private Function splitheader(ByRef sheaderline As String) As Integer
     GetHeaderInfo = Error.Success
 End Function
 'ready
-Private Function buildseperator(ByRef sHeader As String) As Integer
+Private Function buildseperator(ByRef sheader As String) As Integer
     ' take both lines in one string for example : From c@d.com date
     Dim FromLine As String
     Dim DateLine As String
@@ -301,12 +301,13 @@ Private Function replaceaddmail(ByRef iIndex As Integer) As String
     'the task of this function is to replace the the old header in the mbox and save the header & email there
     'look after the index and save the new header & Email
     Dim path As String
-    Dim filename As String
+    Dim Filename As String
     Dim sSearchIndex As String
     
     sSearchIndex = sSearchIndex & iIndex
-    Open path & filename For Input As #mintFnum
-        pos1 = InStr(1, filename, sSearchIndex)
+    Open path & Filename For Input As #mintFnum
+        'fixme: crap
+        'pos1 = InStr(1, Filename, sSearchIndex)
         
     Close #mintFnum
     
@@ -334,19 +335,19 @@ Private Function saveEmailtoMbox(ByRef sEmail As String) As Integer
     Dim Header As String
     Dim Body As String
     Dim path As String
-    Dim filename As String
+    Dim Filename As String
     Static mintMboxIndex As Integer
     
     
     path = mstrMboxPath
-    filename = mstrMboxFileName
-    hederline = buildseperator(sEmail)
+    Filename = mstrMboxFileName
+    HeaderLine = buildseperator(sEmail)
     Header = addEmail(sEmail)(0)
     Body = addEmail(sEmail)(1)
     mintMboxIndex = mintMboxIndex + 1
     iFileLen = FileSystem.FileLen(mstrMboxPath)
     
-    Open path & filename For Input As #mintFnum
+    Open path & Filename For Input As #mintFnum
         Print #mintFnum, HeaderLine
         Print #mintFnum, vbCrLf
         Print #mintFnum, Header
