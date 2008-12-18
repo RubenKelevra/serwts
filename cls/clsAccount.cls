@@ -491,7 +491,7 @@ Private Function getMailDir(ByRef MboxPath As String, ByRef Accountname As Strin
     End If
 End Function
 
-Private Function closeMbox(ByRef index As Long)
+Private Function closeMBox(ByRef index As Long)
     
 End Function
 
@@ -524,7 +524,7 @@ Private Function moveMbox(ByRef index As Long, ByRef newPath As String, ByRef ne
         Exit Function
     End If
     
-    Call closeMbox(index)
+    Call closeMBox(index)
     For Each mboxfile In getMboxFiles(index)
         If Not FileExists(sourceDirectory & mboxfile) Then
             Call Err.Raise(vbObjectError, , "Error mboxfile " & mboxfile & " couldn't be found")
