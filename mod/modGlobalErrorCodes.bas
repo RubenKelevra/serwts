@@ -28,4 +28,5 @@ Public Enum Error
     PopPasswordNotCorrect = 19
     PopAPOPisSupported = 20
     PopErrWhileQuitting = 21
+    PopNoEmailsInAccount = 22
 End Enum
