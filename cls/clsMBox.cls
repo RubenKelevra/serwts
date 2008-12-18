@@ -43,20 +43,24 @@ Public Function renameMBox(ByRef newName As String) As Boolean
     ' - [IN] ByRef newName As String: gives us the new name
     ' - returns true if we had copied the file probably
     
-    Dim iFileLen As Integer
-    Dim iFileLenOld As Integer
+    Dim iFileLen As Long
+    Dim iFileLenOld As Long
     
     iFileLenOld = FileSystem.FileLen(mstrMboxPath)
     
     mstrMboxOldFileName = mstrMboxFileName
-    mstrMboxFildeName = calcFilename(newName)
-    FileSystem.FileCopy mstrMboxPath, mstrMboxPath
+    mstrMboxFileName = calcFilename(newName)
+    If mstrMboxOldFileName = mstrMboxFileName Then 'there is an erronous renaming, exiting
+        Exit Function
+    End If
+    Call FileSystem.FileCopy(mstrMboxPath, mstrMboxPath)
     
     If FileExists(mstrMboxPath) Then
         iFileLen = FileSystem.FileLen(mstrMboxPath)
-        If (Len(iFileLenOld) = Len(iFileLen)) Then
+        If iFileLenOld = iFileLen Then
             renameMBox = True
         Else
+            'fixme, recopy file, if it's again diffrent remove destinationfile and return false
             renameMBox = False
         End If
     Else
@@ -65,20 +69,19 @@ Public Function renameMBox(ByRef newName As String) As Boolean
     
     End Function
 'ready
-Private Function openHandle() As Boolean
+Private Function openHandle(create As Boolean) As Boolean
     'Private openMBox As Boolean
     'Open filehandle to MBox
     ' - returns true if this was ok
     If Not mblnMboxOpen Then
-        If FileExists(mstrMboxPath & mstrMboxFileName) Then
-            mintFnum = FreeFile
-            Open mstrMboxPath & mstrMboxFileName For Random As #mintFnum
-            mblnMboxOpen = True
-            openHandle = True
-        Else
+        If Not FileExists(mstrMboxPath & mstrMboxFileName) And Not create Then
             Call Err.Raise(vbObjectError, , "MBox couldn't be found: '" & mstrMboxPath & mstrMboxFileName & "'")
             Exit Function
         End If
+        mintFnum = FreeFile
+        Open mstrMboxPath & mstrMboxFileName For Random As #mintFnum
+        mblnMboxOpen = True
+        openHandle = True
     Else
         openHandle = False
     End If
@@ -101,17 +104,14 @@ Public Function closeMBox() As Boolean
     End If
 End Function
 'ready
-Public Function openMBox(ByRef path As String, ByRef label As String) As Integer
-    'this function should open the mbox with the given laben in the given path
-    Open path & label For Random As #mintFnum
-End Function
-'ready
-Public Function createMbox(ByRef path As String, ByRef filename As String) As Integer
+Public Function createMbox(ByRef path As String, ByRef Filename As String) As Integer
     'this function should create an empty mbox on the given position, returning
     'false if there is already an mbox or the file could not be created
     mstrMboxPath = path
+    mstrMboxFileName = Filename
     mstrMboxFileName = filename
     
+    If openHandle(True) Then
     If openHandle Then
         createMbox = Error.Success
     Else
@@ -146,9 +146,29 @@ Public Function setPathFile(ByRef path As String, ByRef label As String, CreateN
         End If
     End If
     mstrMboxPath = path
-    Call openHandle
-    
+    setPathFile = openHandle(False)
 End Function
+
+Public Function getMailInfos() As String()
+
+End Function
+
+Public Function GetHeaderInfos() As String()
+
+End Function
+
+Private Function GetHeaderInfo(ByRef sHeader As String, ByRef Output() As String, detailed As Boolean) As Integer
+    'Private SplitHeader as Integer
+    'This function splits the mail/header into lines and try to find FROM, DATE, SUBJECT or if detailed is true: FROM, DATE, SUBJECT, TO-ADDRESS, CONTENT-TYPE
+    ' - [IN] ByRef sHeader As String: the input mail/header
+    ' - [IN] ByRef Output() As String: the output stringarray which have 3 or 5 field, depending on:
+    ' - [IN] detailed As Boolean: if true output have 5 fields
+    ' - returns normally Error.Success
+    Dim sPerLineHeader() As String
+    Dim i As Integer
+    Dim i2 As Long
+    Dim informations As Integer
+    Dim searchword As String
 'ready
 Private Function splitheader(ByRef sheaderline As String) As Integer
     'splitheader(sheader) as Integer
@@ -159,19 +179,46 @@ Private Function splitheader(ByRef sheaderline As String) As Integer
     '// sTeilstring(2) = "date(Type Date zb. 10.12.2008)
     'Split the Header in From, Absender, Betreff, Datum
     
-    Dim sTeilstring() As String
-    Dim sFrom As String
-    Dim sAddresse As String
-    Dim sDate As String
+    'check if it's CRLF or valid LF
+    If Not vbCr = Mid(sHeader, InStr(sHeader, vbLf) - 1, 1) Then 'it's valid LF
+        sPerLineHeader = Split(sHeader, vbLf)
+    Else 'this is crappy CRLF
+        sPerLineHeader = Split(sHeader, vbCrLf)
+    End If
     
-    sTeilstring = Split(sheaderline, " ")
+    If detailed Then
+        informations = 5
+    Else
+        informations = 3
+    End If
     
-    sFrom = sTeilstring(0)
-    sAddresse = sTeilstring(1)
-    sDate = sTeilstring(2)
+    ReDim Output(informations)
+    
+    'fill output()
+    For i = 0 To informations - 1
+        For i2 = LBound(sPerLineHeader) To UBound(sPerLineHeader) - LBound(sPerLineHeader)
+            Select Case i
+                Case 0 'FROM
+                    searchword = "from:"
+                Case 1 'DATE
+                    searchword = "date:"
+                Case 2 'SUBJECT
+                    searchword = "subject:"
+                Case 3 'TO-ADDRESS
+                    searchword = "to:"
+                Case 4 'CONTENT-TYPE
+                    searchword = "content-type:"
+            End Select
+            If LCase$(Left(sPerLineHeader(i2), Len(searchword))) = searchword Then
+                Output(i) = Trim$(Mid$(sPerLineHeader(i2), Len(searchword) + 1, Len(sPerLineHeader) - Len(searchword)))
+                i2 = UBound(sPerLineHeader) - LBound(sPerLineHeader) 'found and does not need to search forward
+            End If
+        Next i2
+    Next i
+    GetHeaderInfo = Error.Success
 End Function
 'ready
-Private Function buildseperator(ByRef sheader As String) As Integer
+Private Function buildseperator(ByRef sHeader As String) As Integer
     ' take both lines in one string for example : From c@d.com date
     Dim FromLine As String
     Dim DateLine As String
