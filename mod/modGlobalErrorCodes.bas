@@ -25,5 +25,7 @@ Public Enum Error
     WskCommunicationTout = 16
     PopUserNotFound = 17
     PopAPOPNotSupported = 18
-    PopPasswordNotCorrect
+    PopPasswordNotCorrect = 19
+    PopAPOPisSupported = 20
+    PopErrWhileQuitting = 21
 End Enum

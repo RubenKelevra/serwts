@@ -25,6 +25,28 @@ Public mblnForceSecuredAuthorisation As Boolean
 Private maMBoxes() As clsMBox
 Private i As Integer
 
+Public Function WskSetup(ByRef wsk As Winsock) As Boolean
+    On Error GoTo WskSetupError
+    
+    With wsk
+        If .State = sckClosed Then
+            .RemoteHost = mstrPOP3Server
+            .RemotePort = mintPort
+        Else
+            WskSetup = False
+            Exit Function
+        End If
+    End With
+    On Error GoTo 0
+    WskSetup = True
+    Exit Function
+    
+WskSetupError:
+    On Error GoTo 0
+    WskSetup = False
+    Exit Function
+End Function
+
 Public Sub saveData(ByRef index As Integer, ByRef Data As String)
     'Public saveData
     'sets various values

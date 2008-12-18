@@ -69,15 +69,32 @@ Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 
-Dim POP3Conn As clsPOP3Connection
-
+Private mMD5 As xclsMD5 'used for APOP-command
+Private mstrServerAddress As String
+Private mintPort As Integer
+Private mblnSecureAuthorisation As Boolean
+Private mblnConfigured As Boolean
+Private mstrPassword As String
+Private mstrUser As String
+Private mstrLoginTime As String 'for APOP command, if not set there's no APOP capability
+Private mstrTempIncommingData As String 'saves temporary the incomming data
+Public Mail As String
+Public UID As String
+Public Length As Long
+Public ID As Long
+Private currentNetworkStatus As Integer
+Private currentPOP3Task As Integer
 
 Private Sub Command1_Click()
-    Dim str() As String
-    Set POP3Conn = New clsPOP3Connection
     
-    Call POP3Conn.Create("pop3", "ci73gruppe4", wskMain, "arktur", 110, True)
-    Call POP3Conn.getMailheaders(str)
+    wskMain.RemoteHost = "pop.northpolyptica.de"
+    wskMain.RemotePort = 110
+    mstrUser = "testing@northpolyptica.de"
+    mstrPassword = "pop"
+    
+    currentNetworkStatus = POP3Stat.awaitingFirstOK
+    currentPOP3Task = POP3TaskCode.getEmailHeaders
+    Call wskMain.Connect
     
 End Sub
 
@@ -96,7 +113,13 @@ Private Sub Form_Load()
         .ListItems.Item(2).ListSubItems.Add , , "rrB"
         .ListItems.Item(2).ListSubItems.Add , , "ssB"
     End With
+    
+    'init of vars
+    Set mMD5 = New xclsMD5
+    mblnConfigured = False
+    currentNetworkStatus = POP3Stat.closed
 End Sub
+
 Private Sub lsvTestView_ColumnClick(ByVal ColumnHeader As MSComctlLib.ColumnHeader)
     Static blnDescending(2) As Boolean
 
@@ -115,3 +138,584 @@ Private Sub lsvTestView_ColumnClick(ByVal ColumnHeader As MSComctlLib.ColumnHead
     
     
 End Sub
+
+Private Sub clearMailData()
+    Length = -1
+    ID = -1
+    Mail = ""
+    UID = ""
+End Sub
+
+Private Function configured() As Boolean
+    configured = mblnConfigured
+End Function
+
+Public Function secureAuthorisation(Optional value As Object) As Integer
+    'Public secureAuthorisation As Boolean
+    'use this to set or get the secure authorisation status
+    ' - [IN] Optional Value As Object: if set it will override the state
+    ' - will return the current setting, furthermore it will return the Value state if set
+    If Not configured Then
+        secureAuthorisation = Error.NotConfigured
+        Exit Function
+    End If
+    If IsMissing(value) Then
+        secureAuthorisation = CInt(mblnSecureAuthorisation)
+    ElseIf getVarType(value) = 3 Then
+        mblnSecureAuthorisation = CBool(value)
+        secureAuthorisation = CInt(mblnSecureAuthorisation)
+    End If
+    
+    
+    Call WskConnect
+    
+End Function
+
+Private Function WskConnect() As Boolean
+    On Error GoTo WskConnectError
+    wskMain.Connect
+    On Error GoTo 0
+    WskConnect = True
+    Exit Function
+    
+WskConnectError:
+    On Error GoTo 0
+    WskConnect = False
+    Exit Function
+    
+End Function
+
+Public Function checkSecureAuthorisation() As Integer
+    'Public secureAuthorisation As Integer
+    'returns the possibility of a SecureAuthorisation to the POP3 Server
+    ' - returns Error.Success if possible
+    If Not configured Then
+        checkSecureAuthorisation = Error.NotConfigured
+        Exit Function
+    End If
+    
+    If Not WskSetup Then
+        checkSecureAuthorisation = Error.WskConf
+    End If
+    
+    If Not WskConnect Then
+        checkSecureAuthorisation = Error.WskConnect
+    End If
+    
+End Function
+
+Private Function CalcAPOP_MD5(ByRef Arrived_Greeting_Data As String, ByRef Pass As String) As String
+        'if we don't get an ok, we abort
+        If Not Left$(Arrived_Greeting_Data, 3) = "+OK" Then
+            Exit Function
+        End If
+        
+        'we wanna get the timestamp
+        CalcAPOP_MD5 = "<" + Split(Arrived_Greeting_Data, "<")(1)
+        CalcAPOP_MD5 = Mid(CalcAPOP_MD5, 1, Len(CalcAPOP_MD5) - 2)
+        
+        'checking syntax
+        If InStr(CalcAPOP_MD5, "<") + 1 = InStr(CalcAPOP_MD5, ">") Then
+            'no date given
+            CalcAPOP_MD5 = ""
+        ElseIf Not Right(CalcAPOP_MD5, 1) = ">" Then
+            'no date given
+            CalcAPOP_MD5 = ""
+        Else
+            CalcAPOP_MD5 = LCase$(mMD5.sum(CalcAPOP_MD5 & mstrPassword & vbNullChar))
+        End If
+End Function
+
+Private Function login() As Integer
+    Dim i As Integer
+    If Not configured Then
+        login = Error.NotConfigured
+        Exit Function
+    End If
+      
+    With mwskNetworkSocket
+        'if connection not closed, we'll close it hardly
+        If Not .State = sckClosed Then
+            Call .Close
+            i = 0
+            'checking if connection is closed
+            While .State = sckClosing
+                If i > SckToutClosing Then
+                    login = Error.WskClosingTout
+                    Exit Function
+                End If
+                i = i + 10
+                'Call Sleep(10)
+            Wend
+        End If
+        
+        'now the connection should be in closed state
+        If Not .State = sckClosed Then
+            login = Error.WskClosingError
+            Exit Function
+        End If
+                    
+        If Not WskSetup Then
+            login = Error.WskConf
+            Exit Function
+        End If
+
+        'we going to connect to Server
+        Call .Connect
+        i = 0
+        While .State = sckConnecting
+            DoEvents
+            If i > SckToutConnecting Then
+                login = Error.WskConnectingTout
+                Exit Function
+            End If
+            i = i + 10
+            'Call Sleep(10)
+        Wend
+        
+        i = getIncommingData(mstrTempIncommingData)
+        
+        'now the connection should be in connected state
+        If Not .State = sckConnected Then
+            Select Case .State
+                Case sckConnectionRefused
+                    login = Error.WskConnectionRefused
+                Case sckConnectionReset
+                    login = Error.WskConnectionReset
+                Case sckHostNotFound
+                    login = Error.WskHostNotFound
+                Case sckNetworkUnreachable
+                    login = Error.WskNetworkUnreachable
+                Case sckNetworkSubsystemFailed
+                    login = Error.WskNetworkSubsystemFailed
+                Case Else
+                    login = Error.WskConnectingFailed
+            End Select
+            Exit Function
+        End If
+        
+        'send login, save logintime (for APOP) if present
+        
+
+        
+        On Error GoTo SendDataError
+        Call .SendData("USER " & mstrUser & vbCrLf)
+        i = getIncommingData(mstrTempIncommingData)
+        If Not Left$(mstrTempIncommingData, 3) = "+OK" Then
+            login = Error.PopUserNotFound
+            Exit Function
+        ElseIf i = Error.WskCommunicationTout Then
+            login = Error.WskCommunicationTout
+            Exit Function
+        End If
+        
+        If mstrLoginTime = "" And mblnSecureAuthorisation Then
+            login = Error.PopAPOPNotSupported
+            Exit Function
+        ElseIf mstrLoginTime = "" Then
+            Call .SendData("PASS " & mstrPassword & vbCrLf)
+        Else
+            Call .SendData("PASS " & mMD5.sum(mstrLoginTime & mstrPassword & vbNullChar) & vbCrLf)
+        End If
+        
+        i = getIncommingData(mstrTempIncommingData)
+        If Not Left$(mstrTempIncommingData, 3) = "+OK" Then
+            login = Error.PopPasswordNotCorrect
+            Exit Function
+        ElseIf i = Error.WskCommunicationTout Then
+            login = Error.WskCommunicationTout
+            Exit Function
+        End If
+        
+        On Error GoTo 0
+    End With
+    
+    login = Error.Success
+    Exit Function
+    
+SendDataError:
+            On Error GoTo 0
+            login = Error.WskSendDataError
+            Exit Function
+End Function
+
+Private Function getIncommingData(ByRef IncommingData As String) As Integer
+    Dim i As Integer
+    
+    i = 0
+    While mwskNetworkSocket.BytesReceived = 0
+        If i > SckToutData Then
+            getIncommingData = Error.WskCommunicationTout
+            Exit Function
+        End If
+        i = i + 10
+        'call Sleep (10)
+    Wend
+    getIncommingData = Error.Success
+    Call mwskNetworkSocket.GetData(IncommingData)
+End Function
+
+Public Function getMailheaders(ByRef output() As String) As Integer
+    If Not configured Then
+        getMailheaders = Error.NotConfigured
+        Exit Function
+    End If
+    
+    getMailheaders = login
+End Function
+
+Public Function getMail(Number As Integer) As Integer
+    If Not configured Then
+        getMail = Error.NotConfigured
+        Exit Function
+    End If
+End Function
+
+Public Function getMailUID(Number As Integer) As Integer
+    If Not configured Then
+        getMailUID = Error.NotConfigured
+        Exit Function
+    End If
+End Function
+
+Private Function isOK(ByRef str As String) As Boolean
+    If Left$(str, 3) = "+OK" Then
+        isOK = True
+    Else
+        isOK = False
+    End If
+End Function
+
+Private Sub errorhandler(code As Integer)
+
+End Sub
+
+Private Function getNumbers(ByRef str As String) As Currency()
+    Dim splitstr() As String
+    Dim i As Integer
+    Dim output() As Currency
+    Dim savedValues As Integer
+    
+    splitstr = Split(str, " ")
+    For i = LBound(splitstr) + 1 To UBound(splitstr) - LBound(splitstr)
+        If splitstr(i) = "" Then
+            'ignore
+        ElseIf getVarType(splitstr(i)) = 98 Or getVarType(splitstr(i)) = 1 Then 'is a 0 or a positive number
+            ReDim Preserve output(savedValues + 1)
+            output(savedValues + 1) = CCur(splitstr(i))
+        Else
+            'ignore not a number
+        End If
+    Next i
+    getNumbers = output
+End Function
+
+Private Sub wskMain_DataArrival(ByVal bytesTotal As Long)
+    Dim ArrivedData As String
+    Dim iArg() As Currency 'currency is used to handle very big numbers
+    Dim tempstr() As String
+    
+    With wskMain
+    
+        Call .GetData(ArrivedData)
+        
+        Select Case currentNetworkStatus
+            Case POP3Stat.closed 'if we do not expect data, we exit
+                'fixme: for debug only
+                MsgBox "Unexpected data arrival: '" & ArrivedData & "'"
+                Exit Sub
+            Case POP3Stat.awaitingFirstOK 'we wait for first ok after connect
+                If currentPOP3Task = POP3TaskCode.NoTask Then
+                    'but no task has been set, so we quit again
+                    currentNetworkStatus = POP3Stat.awaitingQuitOK
+                    Call .SendData("QUIT" & vbCrLf)
+                Else 'in all other cases we want to login, so we send user or apop
+                    If False Then 'If secureAuthorisation Then 'fixme
+                        If Not CalcAPOP_MD5(ArrivedData, mstrPassword) = "" Then 'timestamp ok, sending APOP
+                            currentNetworkStatus = POP3Stat.awaitingPassOK
+                            Call .SendData("APOP " & mstrUser & " " & CalcAPOP_MD5(ArrivedData, mstrPassword) & vbCrLf)
+                        Else 'no timestamp has been send by server, so we have to quit
+                            Call errorhandler(Error.PopAPOPNotSupported)
+                            currentNetworkStatus = POP3Stat.awaitingQuitOK
+                            currentPOP3Task = POP3TaskCode.NoTask
+                            Call .SendData("QUIT" & vbCrLf)
+                        End If
+                    Else 'sending plain password authorisation
+                        currentNetworkStatus = POP3Stat.awaitingUserOK
+                        Call .SendData("USER " & mstrUser & vbCrLf)
+                    End If
+                End If
+            Case POP3Stat.awaitingUserOK 'we wait for an ok after sending user information
+                If currentPOP3Task = POP3TaskCode.NoTask Then
+                    currentNetworkStatus = POP3Stat.awaitingQuitOK
+                    Call .SendData("QUIT" & vbCrLf)
+                Else
+                    If isOK(ArrivedData) Then
+                        currentNetworkStatus = POP3Stat.awaitingPassOK
+                        Call .SendData("PASS " & mstrPassword & vbCrLf)
+                    Else
+                        Call errorhandler(Error.PopPasswordNotCorrect)
+                        currentNetworkStatus = POP3Stat.awaitingQuitOK
+                        Call .SendData("QUIT" & vbCrLf)
+                    End If
+                End If
+            Case POP3Stat.awaitingPassOK 'we wait for an ok after sending password or apop command
+                If isOK(ArrivedData) Then
+                    Select Case currentPOP3Task
+                        Case POP3TaskCode.NoTask
+                            currentNetworkStatus = POP3Stat.awaitingQuitOK
+                            Call .SendData("QUIT" & vbCrLf)
+                        Case POP3TaskCode.checkAPOPCapability
+                            Call errorhandler(Error.PopAPOPisSupported)
+                            currentNetworkStatus = POP3Stat.awaitingQuitOK
+                            Call .SendData("QUIT" & vbCrLf)
+                        Case Else 'check if there are mails in the maildir
+                            currentNetworkStatus = POP3Stat.awaitingStatOK
+                            Call .SendData("STAT" & vbCrLf)
+                    End Select
+                Else
+                    Call errorhandler(Error.PopPasswordNotCorrect)
+                    currentPOP3Task = POP3TaskCode.NoTask
+                    currentNetworkStatus = POP3Stat.closed
+                    wskMain.Close
+                End If
+            Case POP3Stat.awaitingStatOK
+                If currentPOP3Task = POP3TaskCode.NoTask Then
+                    currentNetworkStatus = POP3Stat.awaitingQuitOK
+                    Call .SendData("QUIT" & vbCrLf)
+                ElseIf currentPOP3Task = POP3TaskCode.checkAPOPCapability Then
+                    currentNetworkStatus = POP3Stat.awaitingQuitOK
+                    Call .SendData("QUIT" & vbCrLf)
+                ElseIf isOK(ArrivedData) Then
+                    ReDim iArg(2)
+                    iArg = getNumbers(ArrivedData)
+                    If Not UBound(iArg) - LBound(iArg) = 2 Then GoTo staterr
+                    
+                    Select Case currentPOP3Task
+                        Case POP3TaskCode.getEmailHeaders
+                        Case POP3TaskCode.getNewEmailHeaders_Wuid
+                        Case POP3TaskCode.getNewEmailHeaders_WOuid
+                        Case POP3TaskCode.getOneEmail_Wuid_Wdelete
+                        Case POP3TaskCode.getOneEmail_WOuid_Wdelete
+                        Case POP3TaskCode.getOneEmail_Wuid_WOdelete
+                        Case POP3TaskCode.getOneEmail_WOuid_WOdelete
+                        Case POP3TaskCode.deleteEmail_Wuid
+                        Case POP3TaskCode.deleteEmail_WOuid
+                        Case POP3TaskCode.getAllEmails_Wuid_deleteALL
+                        Case POP3TaskCode.getAllEmails_WOuid_deleteALL
+                        Case POP3TaskCode.getAllEmails_Wuid_NOdelete
+                        Case POP3TaskCode.getAllEmails_WOuid_NOdelete
+                        Case POP3TaskCode.getAllEmails_Wuid_deleteFETCHED
+                        Case POP3TaskCode.getAllEMails_WOuid_deleteFETCHED
+                    End Select
+                Else '-ERR'
+staterr:
+                    'stat doesn't seems to be supported
+                    'trying to handle it with list
+                End If
+            Case POP3Stat.awaitingListOK
+                Select Case currentPOP3Task
+                    Case POP3TaskCode.NoTask
+                        currentNetworkStatus = POP3Stat.awaitingQuitOK
+                        Call .SendData("QUIT" & vbCrLf)
+                    Case POP3TaskCode.checkAPOPCapability
+                        currentNetworkStatus = POP3Stat.awaitingQuitOK
+                        Call .SendData("QUIT" & vbCrLf)
+                    Case POP3TaskCode.getEmailHeaders
+                    Case POP3TaskCode.getNewEmailHeaders_Wuid
+                    Case POP3TaskCode.getNewEmailHeaders_WOuid
+                    Case POP3TaskCode.getOneEmail_Wuid_Wdelete
+                    Case POP3TaskCode.getOneEmail_WOuid_Wdelete
+                    Case POP3TaskCode.getOneEmail_Wuid_WOdelete
+                    Case POP3TaskCode.getOneEmail_WOuid_WOdelete
+                    Case POP3TaskCode.deleteEmail_Wuid
+                    Case POP3TaskCode.deleteEmail_WOuid
+                    Case POP3TaskCode.getAllEmails_Wuid_deleteALL
+                    Case POP3TaskCode.getAllEmails_WOuid_deleteALL
+                    Case POP3TaskCode.getAllEmails_Wuid_NOdelete
+                    Case POP3TaskCode.getAllEmails_WOuid_NOdelete
+                    Case POP3TaskCode.getAllEmails_Wuid_deleteFETCHED
+                    Case POP3TaskCode.getAllEMails_WOuid_deleteFETCHED
+                End Select
+            Case POP3Stat.awaitingRetrOK
+                Select Case currentPOP3Task
+                    Case POP3TaskCode.NoTask
+                        currentNetworkStatus = POP3Stat.awaitingQuitOK
+                        Call .SendData("QUIT" & vbCrLf)
+                    Case POP3TaskCode.checkAPOPCapability
+                        currentNetworkStatus = POP3Stat.awaitingQuitOK
+                        Call .SendData("QUIT" & vbCrLf)
+                    Case POP3TaskCode.getEmailHeaders
+                    Case POP3TaskCode.getNewEmailHeaders_Wuid
+                    Case POP3TaskCode.getNewEmailHeaders_WOuid
+                    Case POP3TaskCode.getOneEmail_Wuid_Wdelete
+                    Case POP3TaskCode.getOneEmail_WOuid_Wdelete
+                    Case POP3TaskCode.getOneEmail_Wuid_WOdelete
+                    Case POP3TaskCode.getOneEmail_WOuid_WOdelete
+                    Case POP3TaskCode.deleteEmail_Wuid
+                    Case POP3TaskCode.deleteEmail_WOuid
+                    Case POP3TaskCode.getAllEmails_Wuid_deleteALL
+                    Case POP3TaskCode.getAllEmails_WOuid_deleteALL
+                    Case POP3TaskCode.getAllEmails_Wuid_NOdelete
+                    Case POP3TaskCode.getAllEmails_WOuid_NOdelete
+                    Case POP3TaskCode.getAllEmails_Wuid_deleteFETCHED
+                    Case POP3TaskCode.getAllEMails_WOuid_deleteFETCHED
+                End Select
+            Case POP3Stat.awaitingDeleOK
+                Select Case currentPOP3Task
+                    Case POP3TaskCode.NoTask
+                        currentNetworkStatus = POP3Stat.awaitingQuitOK
+                        Call .SendData("QUIT" & vbCrLf)
+                    Case POP3TaskCode.checkAPOPCapability
+                        currentNetworkStatus = POP3Stat.awaitingQuitOK
+                        Call .SendData("QUIT" & vbCrLf)
+                    Case POP3TaskCode.getEmailHeaders
+                    Case POP3TaskCode.getNewEmailHeaders_Wuid
+                    Case POP3TaskCode.getNewEmailHeaders_WOuid
+                    Case POP3TaskCode.getOneEmail_Wuid_Wdelete
+                    Case POP3TaskCode.getOneEmail_WOuid_Wdelete
+                    Case POP3TaskCode.getOneEmail_Wuid_WOdelete
+                    Case POP3TaskCode.getOneEmail_WOuid_WOdelete
+                    Case POP3TaskCode.deleteEmail_Wuid
+                    Case POP3TaskCode.deleteEmail_WOuid
+                    Case POP3TaskCode.getAllEmails_Wuid_deleteALL
+                    Case POP3TaskCode.getAllEmails_WOuid_deleteALL
+                    Case POP3TaskCode.getAllEmails_Wuid_NOdelete
+                    Case POP3TaskCode.getAllEmails_WOuid_NOdelete
+                    Case POP3TaskCode.getAllEmails_Wuid_deleteFETCHED
+                    Case POP3TaskCode.getAllEMails_WOuid_deleteFETCHED
+                End Select
+            Case POP3Stat.awaitingNoopOK
+                Select Case currentPOP3Task
+                    Case POP3TaskCode.NoTask
+                        currentNetworkStatus = POP3Stat.awaitingQuitOK
+                        Call .SendData("QUIT" & vbCrLf)
+                    Case POP3TaskCode.checkAPOPCapability
+                        currentNetworkStatus = POP3Stat.awaitingQuitOK
+                        Call .SendData("QUIT" & vbCrLf)
+                    Case POP3TaskCode.getEmailHeaders
+                    Case POP3TaskCode.getNewEmailHeaders_Wuid
+                    Case POP3TaskCode.getNewEmailHeaders_WOuid
+                    Case POP3TaskCode.getOneEmail_Wuid_Wdelete
+                    Case POP3TaskCode.getOneEmail_WOuid_Wdelete
+                    Case POP3TaskCode.getOneEmail_Wuid_WOdelete
+                    Case POP3TaskCode.getOneEmail_WOuid_WOdelete
+                    Case POP3TaskCode.deleteEmail_Wuid
+                    Case POP3TaskCode.deleteEmail_WOuid
+                    Case POP3TaskCode.getAllEmails_Wuid_deleteALL
+                    Case POP3TaskCode.getAllEmails_WOuid_deleteALL
+                    Case POP3TaskCode.getAllEmails_Wuid_NOdelete
+                    Case POP3TaskCode.getAllEmails_WOuid_NOdelete
+                    Case POP3TaskCode.getAllEmails_Wuid_deleteFETCHED
+                    Case POP3TaskCode.getAllEMails_WOuid_deleteFETCHED
+                End Select
+            Case POP3Stat.awaitingRsetOK
+                Select Case currentPOP3Task
+                    Case POP3TaskCode.NoTask
+                        currentNetworkStatus = POP3Stat.awaitingQuitOK
+                        Call .SendData("QUIT" & vbCrLf)
+                    Case POP3TaskCode.checkAPOPCapability
+                        currentNetworkStatus = POP3Stat.awaitingQuitOK
+                        Call .SendData("QUIT" & vbCrLf)
+                    Case POP3TaskCode.getEmailHeaders
+                    Case POP3TaskCode.getNewEmailHeaders_Wuid
+                    Case POP3TaskCode.getNewEmailHeaders_WOuid
+                    Case POP3TaskCode.getOneEmail_Wuid_Wdelete
+                    Case POP3TaskCode.getOneEmail_WOuid_Wdelete
+                    Case POP3TaskCode.getOneEmail_Wuid_WOdelete
+                    Case POP3TaskCode.getOneEmail_WOuid_WOdelete
+                    Case POP3TaskCode.deleteEmail_Wuid
+                    Case POP3TaskCode.deleteEmail_WOuid
+                    Case POP3TaskCode.getAllEmails_Wuid_deleteALL
+                    Case POP3TaskCode.getAllEmails_WOuid_deleteALL
+                    Case POP3TaskCode.getAllEmails_Wuid_NOdelete
+                    Case POP3TaskCode.getAllEmails_WOuid_NOdelete
+                    Case POP3TaskCode.getAllEmails_Wuid_deleteFETCHED
+                    Case POP3TaskCode.getAllEMails_WOuid_deleteFETCHED
+                End Select
+            Case POP3Stat.awaitingQuitOK
+                If isOK(ArrivedData) Then
+                    Call wskMain.Close
+                Else
+                    Call errorhandler(Error.PopErrWhileQuitting)
+                    Call wskMain.Close
+                End If
+            Case POP3Stat.awaitingTopOK
+                Select Case currentPOP3Task
+                    Case POP3TaskCode.NoTask
+                        currentNetworkStatus = POP3Stat.awaitingQuitOK
+                        Call .SendData("QUIT" & vbCrLf)
+                    Case POP3TaskCode.checkAPOPCapability
+                        currentNetworkStatus = POP3Stat.awaitingQuitOK
+                        Call .SendData("QUIT" & vbCrLf)
+                    Case POP3TaskCode.getEmailHeaders
+                    Case POP3TaskCode.getNewEmailHeaders_Wuid
+                    Case POP3TaskCode.getNewEmailHeaders_WOuid
+                    Case POP3TaskCode.getOneEmail_Wuid_Wdelete
+                    Case POP3TaskCode.getOneEmail_WOuid_Wdelete
+                    Case POP3TaskCode.getOneEmail_Wuid_WOdelete
+                    Case POP3TaskCode.getOneEmail_WOuid_WOdelete
+                    Case POP3TaskCode.deleteEmail_Wuid
+                    Case POP3TaskCode.deleteEmail_WOuid
+                    Case POP3TaskCode.getAllEmails_Wuid_deleteALL
+                    Case POP3TaskCode.getAllEmails_WOuid_deleteALL
+                    Case POP3TaskCode.getAllEmails_Wuid_NOdelete
+                    Case POP3TaskCode.getAllEmails_WOuid_NOdelete
+                    Case POP3TaskCode.getAllEmails_Wuid_deleteFETCHED
+                    Case POP3TaskCode.getAllEMails_WOuid_deleteFETCHED
+                End Select
+            Case POP3Stat.awaitingUidlOK
+                Select Case currentPOP3Task
+                    Case POP3TaskCode.NoTask
+                        currentNetworkStatus = POP3Stat.awaitingQuitOK
+                        Call .SendData("QUIT" & vbCrLf)
+                    Case POP3TaskCode.checkAPOPCapability
+                        currentNetworkStatus = POP3Stat.awaitingQuitOK
+                        Call .SendData("QUIT" & vbCrLf)
+                    Case POP3TaskCode.getEmailHeaders
+                    Case POP3TaskCode.getNewEmailHeaders_Wuid
+                    Case POP3TaskCode.getNewEmailHeaders_WOuid
+                    Case POP3TaskCode.getOneEmail_Wuid_Wdelete
+                    Case POP3TaskCode.getOneEmail_WOuid_Wdelete
+                    Case POP3TaskCode.getOneEmail_Wuid_WOdelete
+                    Case POP3TaskCode.getOneEmail_WOuid_WOdelete
+                    Case POP3TaskCode.deleteEmail_Wuid
+                    Case POP3TaskCode.deleteEmail_WOuid
+                    Case POP3TaskCode.getAllEmails_Wuid_deleteALL
+                    Case POP3TaskCode.getAllEmails_WOuid_deleteALL
+                    Case POP3TaskCode.getAllEmails_Wuid_NOdelete
+                    Case POP3TaskCode.getAllEmails_WOuid_NOdelete
+                    Case POP3TaskCode.getAllEmails_Wuid_deleteFETCHED
+                    Case POP3TaskCode.getAllEMails_WOuid_deleteFETCHED
+                End Select
+            Case POP3Stat.awaitingApopOK
+                Select Case currentPOP3Task
+                    Case POP3TaskCode.NoTask
+                        currentNetworkStatus = POP3Stat.awaitingQuitOK
+                        Call .SendData("QUIT" & vbCrLf)
+                    Case POP3TaskCode.checkAPOPCapability
+                        currentNetworkStatus = POP3Stat.awaitingQuitOK
+                        Call .SendData("QUIT" & vbCrLf)
+                    Case POP3TaskCode.getEmailHeaders
+                    
+                    Case POP3TaskCode.getNewEmailHeaders_Wuid
+                    Case POP3TaskCode.getNewEmailHeaders_WOuid
+                    Case POP3TaskCode.getOneEmail_Wuid_Wdelete
+                    Case POP3TaskCode.getOneEmail_WOuid_Wdelete
+                    Case POP3TaskCode.getOneEmail_Wuid_WOdelete
+                    Case POP3TaskCode.getOneEmail_WOuid_WOdelete
+                    Case POP3TaskCode.deleteEmail_Wuid
+                    Case POP3TaskCode.deleteEmail_WOuid
+                    Case POP3TaskCode.getAllEmails_Wuid_deleteALL
+                    Case POP3TaskCode.getAllEmails_WOuid_deleteALL
+                    Case POP3TaskCode.getAllEmails_Wuid_NOdelete
+                    Case POP3TaskCode.getAllEmails_WOuid_NOdelete
+                    Case POP3TaskCode.getAllEmails_Wuid_deleteFETCHED
+                    Case POP3TaskCode.getAllEMails_WOuid_deleteFETCHED
+                End Select
+            Case Default
+                Exit Sub
+        End Select
+    End With
+End Sub
+
