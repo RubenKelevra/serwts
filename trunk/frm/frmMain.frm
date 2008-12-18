@@ -87,14 +87,17 @@ Private currentPOP3Task As Integer
 
 Private Sub Command1_Click()
     
-    wskMain.RemoteHost = "pop.northpolyptica.de"
-    wskMain.RemotePort = 110
-    mstrUser = "testing@northpolyptica.de"
-    mstrPassword = "pop"
-    
-    currentNetworkStatus = POP3Stat.awaitingFirstOK
-    currentPOP3Task = POP3TaskCode.getEmailHeaders
-    Call wskMain.Connect
+    If wskMain.State = sckClosed Then
+        wskMain.RemoteHost = "pop.northpolyptica.de"
+        wskMain.RemotePort = 110
+        mstrUser = "testing@northpolyptica.de"
+        mstrPassword = "pop"
+        
+        currentNetworkStatus = POP3Stat.awaitingFirstOK
+        currentPOP3Task = POP3TaskCode.getEmailHeaders
+        Call wskMain.Connect
+    Else
+    End If
     
 End Sub
 
@@ -393,18 +396,21 @@ End Sub
 Private Function getNumbers(ByRef str As String) As Currency()
     Dim splitstr() As String
     Dim i As Integer
+    Dim i2 As Integer
     Dim output() As Currency
     Dim savedValues As Integer
     
-    splitstr = Split(str, " ")
+    splitstr = Split(Mid(str, 1, Len(str) - 2), " ")
     For i = LBound(splitstr) + 1 To UBound(splitstr) - LBound(splitstr)
         If splitstr(i) = "" Then
             'ignore
-        ElseIf getVarType(splitstr(i)) = 98 Or getVarType(splitstr(i)) = 1 Then 'is a 0 or a positive number
-            ReDim Preserve output(savedValues + 1)
-            output(savedValues + 1) = CCur(splitstr(i))
         Else
-            'ignore not a number
+            i2 = getVarType(splitstr(i))
+            If i2 = 98 Or i2 = 1 Then 'is a 0 or a positive number
+                ReDim Preserve output(savedValues + 1)
+                output(savedValues + 1) = CCur(splitstr(i))
+            End If
+            'else ignore not a number
         End If
     Next i
     getNumbers = output
@@ -487,29 +493,38 @@ Private Sub wskMain_DataArrival(ByVal bytesTotal As Long)
                     currentNetworkStatus = POP3Stat.awaitingQuitOK
                     Call .SendData("QUIT" & vbCrLf)
                 ElseIf isOK(ArrivedData) Then
-                    ReDim iArg(2)
                     iArg = getNumbers(ArrivedData)
-                    If Not UBound(iArg) - LBound(iArg) = 2 Then GoTo staterr
+                    If Not UBound(iArg) - LBound(iArg) = 1 Then GoTo staterr
                     
-                    Select Case currentPOP3Task
-                        Case POP3TaskCode.getEmailHeaders
-                        Case POP3TaskCode.getNewEmailHeaders_Wuid
-                        Case POP3TaskCode.getNewEmailHeaders_WOuid
-                        Case POP3TaskCode.getOneEmail_Wuid_Wdelete
-                        Case POP3TaskCode.getOneEmail_WOuid_Wdelete
-                        Case POP3TaskCode.getOneEmail_Wuid_WOdelete
-                        Case POP3TaskCode.getOneEmail_WOuid_WOdelete
-                        Case POP3TaskCode.deleteEmail_Wuid
-                        Case POP3TaskCode.deleteEmail_WOuid
-                        Case POP3TaskCode.getAllEmails_Wuid_deleteALL
-                        Case POP3TaskCode.getAllEmails_WOuid_deleteALL
-                        Case POP3TaskCode.getAllEmails_Wuid_NOdelete
-                        Case POP3TaskCode.getAllEmails_WOuid_NOdelete
-                        Case POP3TaskCode.getAllEmails_Wuid_deleteFETCHED
-                        Case POP3TaskCode.getAllEMails_WOuid_deleteFETCHED
-                    End Select
+                    If Not iArg(0) = 0 Then 'there are emails which we going to fetch
+                        Select Case currentPOP3Task
+                            Case POP3TaskCode.getEmailHeaders
+                            Case POP3TaskCode.getNewEmailHeaders_Wuid
+                            Case POP3TaskCode.getNewEmailHeaders_WOuid
+                            Case POP3TaskCode.getOneEmail_Wuid_Wdelete
+                            Case POP3TaskCode.getOneEmail_WOuid_Wdelete
+                            Case POP3TaskCode.getOneEmail_Wuid_WOdelete
+                            Case POP3TaskCode.getOneEmail_WOuid_WOdelete
+                            Case POP3TaskCode.deleteEmail_Wuid
+                            Case POP3TaskCode.deleteEmail_WOuid
+                            Case POP3TaskCode.getAllEmails_Wuid_deleteALL
+                            Case POP3TaskCode.getAllEmails_WOuid_deleteALL
+                            Case POP3TaskCode.getAllEmails_Wuid_NOdelete
+                            Case POP3TaskCode.getAllEmails_WOuid_NOdelete
+                            Case POP3TaskCode.getAllEmails_Wuid_deleteFETCHED
+                            Case POP3TaskCode.getAllEMails_WOuid_deleteFETCHED
+                        End Select
+                    Else 'there is nothing to do
+                        currentPOP3Task = POP3TaskCode.NoTask
+                        currentNetworkStatus = POP3Stat.awaitingQuitOK
+                        .SendData ("QUIT" & vbCrLf)
+                    End If
                 Else '-ERR'
 staterr:
+                    'fixme: add code for this case
+                    currentPOP3Task = POP3TaskCode.NoTask
+                    currentNetworkStatus = POP3Stat.awaitingQuitOK
+                    .SendData ("QUIT" & vbCrLf)
                     'stat doesn't seems to be supported
                     'trying to handle it with list
                 End If
