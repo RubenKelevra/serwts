@@ -26,16 +26,19 @@ Public parentbox As Integer
 Private mstrMBoxLabel As String
 Private mstrMboxFromline As String
 
+Private UIDs() As String
+Private Seperators() As String
+
 
 Private mMD5 As xclsMD5
 Private mSHA256 As xclsSHA256
-'ready
+
 Public Function getMBoxName() As String
     'Public getMBoxName As String
     ' - returns the name of the mbox
     getMBoxName = mstrMBoxLabel
 End Function
-'ready
+
 Public Function renameMBox(ByRef newName As String) As Boolean
     'Public renameMBox As Boolean
     'renames the MBox, moves the MBox file 'cause we won't find it again if we changed the name
@@ -67,9 +70,39 @@ Public Function renameMBox(ByRef newName As String) As Boolean
         renameMBox = False
     End If
     
+    
+    'blablablub
+    For i = 1 To mAccountSettings(index).getMboxCount
+        
+        
+        If Not FileExists(sourceDirectory & mboxfile) Then
+            Call Err.Raise(vbObjectError, , "Error mboxfile " & mboxfile & " couldn't be found")
+            'fixme: clean up
+            Exit Function
+        End If
+        'file seems to be there, we try to copy
+        On Error GoTo filecopyerror
+        Call FileSystem.FileCopy(sourceDirectory & mboxfile, destinationDirectory & mboxfile)
+        On Error GoTo 0
+    Next mboxfile
+    
+    For Each mboxfile In getMboxFiles(index)
+        If Not FileExists(destinationDirectory & mboxfile) Then
+            Call Err.Raise(vbObjectError, , "Error on copy, destination file does not exist anymore: " & mboxfile & "")
+            'fixme: clean up
+            Exit Function
+        End If
+        'destination file seems to be ok
+        On Error GoTo sourcefiledeleteerror
+        Call FileSystem.Kill(sourceDirectory & mboxfile)
+        On Error GoTo 0
+    Next mboxfile
+    '/blablablub
+    
+    
     End Function
-'ready
-Private Function openHandle(Create As Boolean) As Boolean
+
+Private Function openAppendHandle(Create As Boolean) As Boolean
     'Private openMBox As Boolean
     'Open filehandle to MBox
     ' - returns true if this was ok
@@ -79,18 +112,55 @@ Private Function openHandle(Create As Boolean) As Boolean
             Exit Function
         End If
         mintFnum = FreeFile
-        Open mstrMboxPath & mstrMboxFileName For Random As #mintFnum
+        Open mstrMboxPath & mstrMboxFileName For Append As #mintFnum
         mblnMboxOpen = True
         openHandle = True
     Else
         openHandle = False
     End If
 End Function
-'ready
+
+
+Private Function openOutputHandle(Create As Boolean) As Boolean
+    'Private openMBox As Boolean
+    'Open filehandle to MBox
+    ' - returns true if this was ok
+    If Not mblnMboxOpen Then
+        If Not FileExists(mstrMboxPath & mstrMboxFileName) And Not Create Then
+            Call Err.Raise(vbObjectError, , "MBox couldn't be found: '" & mstrMboxPath & mstrMboxFileName & "'")
+            Exit Function
+        End If
+        mintFnum = FreeFile
+        Open mstrMboxPath & mstrMboxFileName For Output As #mintFnum
+        mblnMboxOpen = True
+        openHandle = True
+    Else
+        openHandle = False
+    End If
+End Function
+
+Private Function openInputHandle(Create As Boolean) As Boolean
+    'Private openMBox As Boolean
+    'Open filehandle to MBox
+    ' - returns true if this was ok
+    If Not mblnMboxOpen Then
+        If Not FileExists(mstrMboxPath & mstrMboxFileName) And Not Create Then
+            Call Err.Raise(vbObjectError, , "MBox couldn't be found: '" & mstrMboxPath & mstrMboxFileName & "'")
+            Exit Function
+        End If
+        mintFnum = FreeFile
+        Open mstrMboxPath & mstrMboxFileName For Input As #mintFnum
+        mblnMboxOpen = True
+        openHandle = True
+    Else
+        openHandle = False
+    End If
+End Function
+
 Public Function isOpen() As Boolean
     isOpen = mblnMboxOpen
 End Function
-'ready
+
 Public Function closeMBox() As Boolean
     'Public closeMBox As Boolean
     'Close filehandle to MBox
@@ -103,29 +173,27 @@ Public Function closeMBox() As Boolean
         closeMBox = False
     End If
 End Function
-'ready
+
 Public Function createMbox(ByRef path As String, ByRef Filename As String) As Integer
     'this function should create an empty mbox on the given position, returning
     'false if there is already an mbox or the file could not be created
     mstrMboxPath = path
     mstrMboxFileName = Filename
-    mstrMboxFileName = Filename
     
-    If openHandle(True) Then
-    If openHandle Then
+    If openWriteHandle(True) Then
         createMbox = Error.Success
     Else
         createMbox = Error.Unsuccess
     End If
 End Function
-'ready
+
 Private Function calcFilename(ByRef label As String) As String
     'Private calcFilename As String
     ' - [IN] ByRef Filename As String: label of the mbox
     ' - returns the "encrypted" filename for our mbox
     calcFilename = mMD5.sum(mSHA256.sum(label)) & ".box"
 End Function
-'ready
+
 Public Function setPathFile(ByRef path As String, ByRef label As String, CreateNonExisting As Boolean) As Boolean
     mstrMboxFileName = calcFilename(label)
     If CreateNonExisting Then
@@ -150,12 +218,46 @@ Public Function setPathFile(ByRef path As String, ByRef label As String, CreateN
 End Function
 
 Public Function getMailInfos() As String()
-
+    Call closeMBox
+    Call openInputHandle(False)
+    
 End Function
 
 Public Function GetHeaderInfos() As String()
-
+    Call closeMBox
+    Call openInputHandle(False)
+    
 End Function
+
+Public Sub getUIDs(ByRef AllUIDs() As String)
+    Call getAllUIDs(UIDs, Seperators)
+    AllUIDs = UIDs
+End Sub
+
+Private Sub getAllUIDs(ByRef Output() As String, ByRef Seperators() As String)
+    Dim fileline As String
+    Dim email As Integer
+    
+    Call closeMBox
+    Call openInputHandle(False)
+    
+    Do While Not EOF(mintFnum)
+        Line Input #mintFnum, fileline
+        
+        'if line is seperator
+        If LCase$(Left$(fileline, 5)) = "from " Then
+            ReDim Preserve Seperators(email)
+            Seperators(email) = fileline
+            email = email + 1
+        ElseIf LCase$(Left$(fileline, 6)) = "x-uid:" Then
+            ReDim Preserve Output(email)
+            Output(email) = Mid(fileline, 7, Len(fileline) - 6)
+        End If
+    Loop
+    
+    'if not already on the right size, we'll change it
+    ReDim Preserve Output(email)
+End Sub
 
 Private Function GetHeaderInfo(ByRef sheader As String, ByRef Output() As String, detailed As Boolean) As Integer
     'Private SplitHeader as Integer
@@ -169,15 +271,6 @@ Private Function GetHeaderInfo(ByRef sheader As String, ByRef Output() As String
     Dim i2 As Long
     Dim informations As Integer
     Dim searchword As String
-'ready
-Private Function splitheader(ByRef sheaderline As String) As Integer
-    'splitheader(sheader) as Integer
-    'gibt als Integer einen Fehler Wert oder eine Ok als zulässig aus
-    'This function split the string by ever " " and save the parts in other strings
-    '// sTeilstring(0) = "From " if not = false
-    '// sTeilstring(1) = "email-Address" if not = false example : myemail@web.de
-    '// sTeilstring(2) = "date(Type Date zb. 10.12.2008)
-    'Split the Header in From, Absender, Betreff, Datum
     
     'check if it's CRLF or valid LF
     If Not vbCr = Mid(sheader, InStr(sheader, vbLf) - 1, 1) Then 'it's valid LF
@@ -217,7 +310,7 @@ Private Function splitheader(ByRef sheaderline As String) As Integer
     Next i
     GetHeaderInfo = Error.Success
 End Function
-'ready
+
 Private Function buildseperator(ByRef sheader As String) As Integer
     ' take both lines in one string for example : From c@d.com date
     Dim FromLine As String
@@ -230,7 +323,7 @@ Private Function buildseperator(ByRef sheader As String) As Integer
     
 
 End Function
-'ready
+
 Private Function getSubject(ByRef sheader) As String
     'subjectLine reading
     pos1 = InStr(1, sheader, "SUBJECT:")
@@ -238,7 +331,7 @@ Private Function getSubject(ByRef sheader) As String
     'example : Das ist ein Beispiel Betreff
     
 End Function
-'ready
+
 Private Function getDate(ByRef sheader) As String
     'DateLine reading
     pos1 = InStr(1, sheader, "DATE:")
@@ -246,33 +339,33 @@ Private Function getDate(ByRef sheader) As String
     'example : wed, 26 Nov 2008 07:58:08 +0100
 
 End Function
-'ready
+
 Private Function getAddyFrom(ByRef sheader) As String
     'FromLine reading
     pos1 = InStr(1, sheader, "FROM:")
     getAddyFrom = Mid(sheader, pos1 + 5, vbCrLf)
     'example : root <root@arktur.btr-rs.local>
 End Function
-'ready
+
 Private Function getAddyTo(ByRef sheader) As String
     'ToLine reading
     pos1 = InStr(1, sheader, "To:")
     getAddyTo = Mid(sheader, pos1 + 3, vbcrfl)
 End Function
-'ready
+
 Private Function getUID(sheader) As String
     'reading the line where the UID is
     pos1 = InStr(1, sheader, "UID:")
     getUID = Mid(sheader, pos1 + 4, vbcrfl)
 End Function
-'ready
+
 Private Function getIndex(sheader) As String
     'reading the line where the Index is
     pos1 = InStr(1, sheader, "x-Index:")
     getIndex = Mid(sheader, pos1 + 8, vbcrfl)
 End Function
 
-'not ready
+
 Public Function getMailInfo(detailed As Boolean) As String()
         'save this in string arry by ever index
         '1.Subject
@@ -288,14 +381,14 @@ Public Function getMailInfo(detailed As Boolean) As String()
         End If
 End Function
 
-'not ready
+
 Private Function addheader(ByRef iIndex As Integer) As String
     'the task of this function is to call only the header
     
 
 End Function
 
-'not ready
+
 Private Function replaceaddmail(ByRef iIndex As Integer) As String
     'private function replaceaddmail as string
     'the task of this function is to replace the the old header in the mbox and save the header & email there
@@ -312,7 +405,7 @@ Private Function replaceaddmail(ByRef iIndex As Integer) As String
     Close #mintFnum
     
 End Function
-'ready
+
 Public Function addEmail(sEmail) As String()
 'Public function()as string()
 'the coming Email should split in header an body
@@ -324,7 +417,7 @@ addEmail = Split(sEmail, "")
 
 
 End Function
-'ready
+
 Private Function saveEmailtoMbox(ByRef sEmail As String) As Integer
     'funtion saveEmailtoMbox(fromline, Header, Body, path, Filename) as integer
     'this function give an integer as error marker or as ok sign back

@@ -34,8 +34,8 @@ Private mAccountSettings() As clsAccountSettings
 
 Private mSHA256 As xclsSHA256
 Private mBlowfish As xclsBlowfish
-Private mHuffman As xclsHuffman
 Private mMD5 As xclsMD5
+Private mHuffman As xclsHuffman
 
 Private Sub Class_Initialize()
     'Private Class_Initialize
@@ -59,7 +59,7 @@ Private Sub SetFilenames(ByRef User As String)
     'Private setFilename
     'calcs the local var for the filenames
     ' - [IN] ByRef User As String: The username which is used to login
-    mFile = mMD5.sum(mSHA256.sum(User))
+    mFile = mMD5.DigestStrToHexStr(mSHA256.SHA256(User))
     mBakFile = mFile & ".bak"
     mFile = mFile & ".acc"
 End Sub
@@ -70,13 +70,13 @@ Private Sub SetPassword(ByRef UserSHA256 As String, ByRef Pass As String)
     'while decrypting and encrypting via blowfish
     ' - [IN] ByRef User As String: The login name of the user
     ' - [IN] ByRef Pass As String: The given password for this user
-    mPass = mSHA256.sum(Pass & UserSHA256)
+    mPass = mSHA256.Sum(Pass & UserSHA256)
 End Sub
 Private Sub SetUserSHA256(ByRef User As String)
     'Private Sub SetUserSHA256
     'calcs the SHA256 sum of the given user and setting the var
     ' - [IN] ByRef User As String: The login name of the user
-    mUserChkSum = mSHA256.sum(User)
+    mUserChkSum = mSHA256.Sum(User)
 End Sub
 
 Public Function login(ByRef User As String, ByRef Pass As String) As Boolean
@@ -156,7 +156,7 @@ Private Function AccountWriter(ByRef AccSettings() As clsAccountSettings) As Str
                 CStr(.mblnForceSecuredAuthorisation) & vbLf
         End With
     Next i
-    AccountWriter = AccountWriter & "END" & vbEOF
+    AccountWriter = AccountWriter & "END"
 End Function
 
 Private Sub AccountReader(ByRef Data As String, ByRef AccSettings() As clsAccountSettings)
@@ -243,7 +243,7 @@ Private Sub SaveConfig()
     
     'write data to acc file
     Open mPath & mFile For Output As #fnum
-        Put fnum, , Data
+        Write #fnum, , Data
     Close #fnum
 End Sub
 
@@ -326,8 +326,12 @@ Public Sub addAccountSettings(ByRef Accountname As String, ByRef POP3Server As S
     ' - [IN] ByRef Password As String: The password which is used to login
     ' - [IN] Optional ByRef MboxPath As String = "":
     'allocate space for new account
-    ReDim Preserve mAccountSettings(UBound(mAccountSettings) - LBound(mAccountSettings) + 1)
+    On Error GoTo noAccountExists
+        ReDim Preserve mAccountSettings(UBound(mAccountSettings) - LBound(mAccountSettings) + 1)
+    On Error GoTo 0
+    Set mAccountSettings(UBound(mAccountSettings) - LBound(mAccountSettings) + 1) = New clsAccountSettings
     
+dostuff:
     With mAccountSettings(UBound(mAccountSettings) - LBound(mAccountSettings))
         .mstrAccountName = Accountname
         .mstrPOP3Server = POP3Server
@@ -340,6 +344,14 @@ Public Sub addAccountSettings(ByRef Accountname As String, ByRef POP3Server As S
     End With
     
     Call SaveConfig
+    
+    Exit Sub
+    
+noAccountExists:
+    Call SetFilenames(mUser)
+    ReDim mAccountSettings(0)
+    Set mAccountSettings(0) = New clsAccountSettings
+    GoTo dostuff
 End Sub
 
 Private Function mailFetched(ByRef index As Long) As Boolean
@@ -487,7 +499,7 @@ Private Function getMailDir(ByRef MboxPath As String, ByRef Accountname As Strin
         End If
     End If
     If Not Accountname = "" Then
-        getMailDir = getMailDir & mMD5.sum(mSHA256.sum(Accountname)) & BackSlash
+        getMailDir = getMailDir & mMD5.Sum(mSHA256.Sum(Accountname)) & BackSlash
     End If
 End Function
 
@@ -499,8 +511,29 @@ Private Function openMbox(ByRef index As Long)
     
 End Function
 
+Public Function getInboxMbox(accountindex As Integer) As Integer
+    If accountindex >= LBound(mAccountSettings) And accountindex <= UBound(mAccountSettings) - LBound(mAccountSettings) Then
+        getInboxMbox = mAccountSettings(accountindex).getInboxMbox
+    Else
+        getInboxMbox = vbIntMax
+    End If
+End Function
+
+Public Function setInboxMbox(accountindex As Integer, newmboxindex As Integer) As Integer
+    If accountindex >= LBound(mAccountSettings) And accountindex <= UBound(mAccountSettings) - LBound(mAccountSettings) Then
+        setInboxMbox = mAccountSettings(accountindex).setInboxMbox(mboxindex)
+    Else
+        setInboxMbox = Error.outofarray
+    End If
+End Function
+
+Public Function getUIDs(accountindex As Integer, mboxindex As Integer) As String()
+    Call mAccountSettings(accountindex).getUIDs(mboxindex, getUIDs)
+End Function
+
+
 Private Function moveMbox(ByRef index As Long, ByRef newPath As String, ByRef newAccountname As String)
-    Dim mboxfile As Variant
+    Dim i As Integer
     Dim sourceDirectory As String
     Dim destinationDirectory As String
     
@@ -524,30 +557,10 @@ Private Function moveMbox(ByRef index As Long, ByRef newPath As String, ByRef ne
         Exit Function
     End If
     
-    Call closeMBox(index)
-    For Each mboxfile In getMboxFiles(index)
-        If Not FileExists(sourceDirectory & mboxfile) Then
-            Call Err.Raise(vbObjectError, , "Error mboxfile " & mboxfile & " couldn't be found")
-            'fixme: clean up
-            Exit Function
-        End If
-        'file seems to be there, we try to copy
-        On Error GoTo filecopyerror
-        Call FileSystem.FileCopy(sourceDirectory & mboxfile, destinationDirectory & mboxfile)
-        On Error GoTo 0
-    Next mboxfile
     
-    For Each mboxfile In getMboxFiles(index)
-        If Not FileExists(destinationDirectory & mboxfile) Then
-            Call Err.Raise(vbObjectError, , "Error on copy, destination file does not exist anymore: " & mboxfile & "")
-            'fixme: clean up
-            Exit Function
-        End If
-        'destination file seems to be ok
-        On Error GoTo sourcefiledeleteerror
-        Call FileSystem.Kill(sourceDirectory & mboxfile)
-        On Error GoTo 0
-    Next mboxfile
+    
+    'fixme: returnvalue
+    Exit Function
     
 filecopyerror:
     Call Err.Raise(vbObjectError, , "File couldn't be copy to destination directory or couldn't be read" & vbCrLf & "Source: '" & sourceDirectory & mboxfile & "'" & vbCrLf & "Destination: '" & destinationDirectory & mboxfile & "'")
