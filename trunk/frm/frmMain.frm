@@ -401,12 +401,11 @@ Private Function getNumbers(ByRef str As String) As Currency()
     Dim savedValues As Integer
     
     splitstr = Split(Replace(str, vbCrLf, " "), " ")
+    
     For i = LBound(splitstr) + 1 To UBound(splitstr) - LBound(splitstr)
-        If splitstr(i) = "" Then
-            'ignore
-        Else
-            i2 = getVarType(splitstr(i))
-            If i2 = 98 Or i2 = 1 Then 'is a 0 or a positive number
+        If Not splitstr(i) = "" Then
+            'i2 = getVarType(splitstr(i))
+            If IsNumeric(splitstr(i)) Then 'is a 0 or a positive number
                 ReDim Preserve Output(savedValues)
                 Output(savedValues) = CCur(splitstr(i))
                 savedValues = savedValues + 1
@@ -415,6 +414,49 @@ Private Function getNumbers(ByRef str As String) As Currency()
         End If
     Next i
     getNumbers = Output
+End Function
+
+Private Function getNewUIDs(ByRef server() As String, ByRef mbox() As String) As String()
+    Dim i As Integer
+    Dim i2 As Integer
+    Dim Output() As String
+    Dim foundEntries As Integer
+    
+    
+    For i = LBound(server) To UBound(server) - LBound(server)
+        For i2 = LBound(mbox) To UBound(mbox) - LBound(mbox)
+            If server(i) = mbox(i2) Then
+                Exit For
+            ElseIf i2 = UBound(mbox) - LBound(mbox) Then 'is this a new one
+                ReDim Preserve Output(foundEntries)
+                Output(foundEntries) = server(i)
+                foundEntries = foundEntries + 1
+            End If
+        Next i2
+    Next i
+    getNewUIDs = Output
+End Function
+
+Private Function getUIDs(ByRef str As String) As String()
+    Dim splitstr() As String
+    Dim foundValues As Integer
+    Dim Output() As String
+    Dim savedValues As Integer
+    Dim i As Integer
+    
+    splitstr = Split(Replace(Mid$(str, 6, Len(str) - 5 - 5), vbCrLf, " "), " ")
+    
+    For i = LBound(splitstr) + 1 To UBound(splitstr) - LBound(splitstr)
+        If Not Trim$(splitstr(i)) = "" Then
+            If foundValues Mod 2 = 0 Then
+                ReDim Preserve Output(savedValues)
+                Output(savedValues) = Trim$(splitstr(i))
+                savedValues = savedValues + 1
+            End If
+            foundValues = foundValues + 1
+        End If
+    Next i
+    getUIDs = Output
 End Function
 
 Private Function endDot(ByRef str As String) As Boolean
@@ -540,6 +582,7 @@ staterr:
                 If endDot(sArg) Then 'transmission finished
                     If isOK(sArg) Then
                         iArg = getNumbers(sArg)
+                        sArg = ""
                         
                         ReDim currentEMails(((UBound(iArg) - LBound(iArg) + 1) / 2) - 1)
                         
@@ -550,7 +593,6 @@ staterr:
                         Next i
                         
                         If 2 <= currentPOP3Task And currentPOP3Task <= 9 Then 'needed uid-support
-                            ReDim currentEmailUIDs((UBound(iArg) - LBound(iArg) + 1) / 2)
                             Erase iArg
                             currentNetworkStatus = POP3Stat.awaitingUidlOK
                             Call .SendData("UIDL" & vbCrLf)
@@ -585,6 +627,22 @@ staterr:
                     
                 End If
             Case POP3Stat.awaitingUidlOK
+                sArg = sArg & ArrivedData
+                If endDot(sArg) Then 'transmission finished
+                    If isOK(sArg) Then
+                        Erase currentEmailUIDs
+                        currentEmailUIDs = getUIDs(sArg)
+                        sArg = ""
+                    
+                    Else '-ERR
+                        'we have to switch to the WOuid mode
+                        If 3 <= currentPOP3Task And currentPOP3Task <= 9 Then
+                            currentPOP3Task = currentPOP3Task + 7
+                        ElseIf currentPOP3Task = POP3TaskCode.getEmailHeaders Then
+                        
+                        End If
+                    End If
+                End If
                 Select Case currentPOP3Task
                     Case POP3TaskCode.NoTask
                         currentNetworkStatus = POP3Stat.awaitingQuitOK
