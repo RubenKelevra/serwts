@@ -70,6 +70,7 @@ Attribute VB_Exposed = False
 Option Explicit
 
 Private mMD5 As xclsMD5 'used for APOP-command
+Private Account As clsAccount
 Private mstrServerAddress As String
 Private mintPort As Integer
 Private mblnSecureAuthorisation As Boolean
@@ -78,6 +79,7 @@ Private mstrPassword As String
 Private mstrUser As String
 Private mstrLoginTime As String 'for APOP command, if not set there's no APOP capability
 Private mstrTempIncommingData As String 'saves temporary the incomming data
+Private currentAccountindex As Integer
 Public Mail As String
 Public uid As String
 Public Length As Long
@@ -121,6 +123,10 @@ Private Sub Form_Load()
     Set mMD5 = New xclsMD5
     mblnConfigured = False
     currentNetworkStatus = POP3Stat.closed
+    'fixme, this should be in login
+    Set Account = New clsAccount
+    Call Account.addAccountSettings("Testing", "pop.northpolyptica.de", 110, "testing@northpolyptica.de", "pop", False)
+    
 End Sub
 
 Private Sub lsvTestView_ColumnClick(ByVal ColumnHeader As MSComctlLib.ColumnHeader)
@@ -358,7 +364,7 @@ Private Function getIncommingData(ByRef IncommingData As String) As Integer
     Call mwskNetworkSocket.GetData(IncommingData)
 End Function
 
-Public Function getMailheaders(ByRef Output() As String) As Integer
+Public Function getMailheaders(ByRef output() As String) As Integer
     If Not configured Then
         getMailheaders = Error.NotConfigured
         Exit Function
@@ -397,7 +403,7 @@ Private Function getNumbers(ByRef str As String) As Currency()
     Dim splitstr() As String
     Dim i As Integer
     Dim i2 As Integer
-    Dim Output() As Currency
+    Dim output() As Currency
     Dim savedValues As Integer
     
     splitstr = Split(Replace(str, vbCrLf, " "), " ")
@@ -406,41 +412,34 @@ Private Function getNumbers(ByRef str As String) As Currency()
         If Not splitstr(i) = "" Then
             'i2 = getVarType(splitstr(i))
             If IsNumeric(splitstr(i)) Then 'is a 0 or a positive number
-                ReDim Preserve Output(savedValues)
-                Output(savedValues) = CCur(splitstr(i))
+                ReDim Preserve output(savedValues)
+                output(savedValues) = CCur(splitstr(i))
                 savedValues = savedValues + 1
             End If
             'else ignore not a number
         End If
     Next i
-    getNumbers = Output
+    getNumbers = output
 End Function
 
-Private Function getNewUIDs(ByRef server() As String, ByRef mbox() As String) As String()
+Private Sub blankOldUIDs(ByRef server() As String, ByRef mbox() As String)
     Dim i As Integer
     Dim i2 As Integer
-    Dim Output() As String
     Dim foundEntries As Integer
-    
     
     For i = LBound(server) To UBound(server) - LBound(server)
         For i2 = LBound(mbox) To UBound(mbox) - LBound(mbox)
-            If server(i) = mbox(i2) Then
-                Exit For
-            ElseIf i2 = UBound(mbox) - LBound(mbox) Then 'is this a new one
-                ReDim Preserve Output(foundEntries)
-                Output(foundEntries) = server(i)
-                foundEntries = foundEntries + 1
+            If server(i) = mbox(i2) Then 'found in inbox
+                server(i) = ""
             End If
         Next i2
     Next i
-    getNewUIDs = Output
-End Function
+End Sub
 
 Private Function getUIDs(ByRef str As String) As String()
     Dim splitstr() As String
     Dim foundValues As Integer
-    Dim Output() As String
+    Dim output() As String
     Dim savedValues As Integer
     Dim i As Integer
     
@@ -449,14 +448,14 @@ Private Function getUIDs(ByRef str As String) As String()
     For i = LBound(splitstr) + 1 To UBound(splitstr) - LBound(splitstr)
         If Not Trim$(splitstr(i)) = "" Then
             If foundValues Mod 2 = 0 Then
-                ReDim Preserve Output(savedValues)
-                Output(savedValues) = Trim$(splitstr(i))
+                ReDim Preserve output(savedValues)
+                output(savedValues) = Trim$(splitstr(i))
                 savedValues = savedValues + 1
             End If
             foundValues = foundValues + 1
         End If
     Next i
-    getUIDs = Output
+    getUIDs = output
 End Function
 
 Private Function endDot(ByRef str As String) As Boolean
@@ -592,7 +591,7 @@ staterr:
                             i2 = i2 + 1
                         Next i
                         
-                        If 2 <= currentPOP3Task And currentPOP3Task <= 9 Then 'needed uid-support
+                        If 2 <= currentPOP3Task And currentPOP3Task <= 9 Then 'we need uid-support
                             Erase iArg
                             currentNetworkStatus = POP3Stat.awaitingUidlOK
                             Call .SendData("UIDL" & vbCrLf)
@@ -606,19 +605,12 @@ staterr:
                                     currentNetworkStatus = POP3Stat.awaitingQuitOK
                                     Call .SendData("QUIT" & vbCrLf)
                                 Case POP3TaskCode.getEmailHeaders
-                                Case POP3TaskCode.getNewEmailHeaders_Wuid
                                 Case POP3TaskCode.getNewEmailHeaders_WOuid
-                                Case POP3TaskCode.getOneEmail_Wuid_Wdelete
                                 Case POP3TaskCode.getOneEmail_WOuid_Wdelete
-                                Case POP3TaskCode.getOneEmail_Wuid_WOdelete
                                 Case POP3TaskCode.getOneEmail_WOuid_WOdelete
-                                Case POP3TaskCode.deleteEmail_Wuid
                                 Case POP3TaskCode.deleteEmail_WOuid
-                                Case POP3TaskCode.getAllEmails_Wuid_deleteALL
                                 Case POP3TaskCode.getAllEmails_WOuid_deleteALL
-                                Case POP3TaskCode.getAllEmails_Wuid_NOdelete
                                 Case POP3TaskCode.getAllEmails_WOuid_NOdelete
-                                Case POP3TaskCode.getAllEmails_Wuid_deleteFETCHED
                                 Case POP3TaskCode.getAllEMails_WOuid_deleteFETCHED
                             End Select
                         End If
@@ -631,9 +623,30 @@ staterr:
                 If endDot(sArg) Then 'transmission finished
                     If isOK(sArg) Then
                         Erase currentEmailUIDs
+                        
                         currentEmailUIDs = getUIDs(sArg)
                         sArg = ""
-                    
+                        Call blankOldUIDs(currentEmailUIDs, Account.getUIDs(currentAccountindex, Account.getInboxMbox(currentAccountindex)))
+                        
+                        currentEmailPosition = 1
+                        
+                        Select Case currentPOP3Task
+                            Case POP3TaskCode.NoTask
+                                currentNetworkStatus = POP3Stat.awaitingQuitOK
+                                Call .SendData("QUIT" & vbCrLf)
+                            Case POP3TaskCode.checkAPOPCapability
+                                currentNetworkStatus = POP3Stat.awaitingQuitOK
+                                Call .SendData("QUIT" & vbCrLf)
+                            Case POP3TaskCode.getEmailHeaders
+                            Case POP3TaskCode.getNewEmailHeaders_Wuid
+                            Case POP3TaskCode.getOneEmail_Wuid_Wdelete
+                            Case POP3TaskCode.getOneEmail_WOuid_Wdelete
+                            Case POP3TaskCode.deleteEmail_Wuid
+                            Case POP3TaskCode.getAllEmails_Wuid_deleteALL
+                            Case POP3TaskCode.getAllEmails_Wuid_NOdelete
+                            Case POP3TaskCode.getAllEmails_Wuid_deleteFETCHED
+                        End Select
+                        
                     Else '-ERR
                         'we have to switch to the WOuid mode
                         If 3 <= currentPOP3Task And currentPOP3Task <= 9 Then
@@ -643,29 +656,6 @@ staterr:
                         End If
                     End If
                 End If
-                Select Case currentPOP3Task
-                    Case POP3TaskCode.NoTask
-                        currentNetworkStatus = POP3Stat.awaitingQuitOK
-                        Call .SendData("QUIT" & vbCrLf)
-                    Case POP3TaskCode.checkAPOPCapability
-                        currentNetworkStatus = POP3Stat.awaitingQuitOK
-                        Call .SendData("QUIT" & vbCrLf)
-                    Case POP3TaskCode.getEmailHeaders
-                    Case POP3TaskCode.getNewEmailHeaders_Wuid
-                    Case POP3TaskCode.getNewEmailHeaders_WOuid
-                    Case POP3TaskCode.getOneEmail_Wuid_Wdelete
-                    Case POP3TaskCode.getOneEmail_WOuid_Wdelete
-                    Case POP3TaskCode.getOneEmail_Wuid_WOdelete
-                    Case POP3TaskCode.getOneEmail_WOuid_WOdelete
-                    Case POP3TaskCode.deleteEmail_Wuid
-                    Case POP3TaskCode.deleteEmail_WOuid
-                    Case POP3TaskCode.getAllEmails_Wuid_deleteALL
-                    Case POP3TaskCode.getAllEmails_WOuid_deleteALL
-                    Case POP3TaskCode.getAllEmails_Wuid_NOdelete
-                    Case POP3TaskCode.getAllEmails_WOuid_NOdelete
-                    Case POP3TaskCode.getAllEmails_Wuid_deleteFETCHED
-                    Case POP3TaskCode.getAllEMails_WOuid_deleteFETCHED
-                End Select
             Case POP3Stat.awaitingRetrOK
                 Select Case currentPOP3Task
                     Case POP3TaskCode.NoTask

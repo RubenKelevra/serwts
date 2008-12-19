@@ -6,7 +6,7 @@ BEGIN
   DataSourceBehavior  = 0  'vbNone
   MTSTransactionMode  = 0  'NotAnMTSObject
 END
-Attribute VB_Name = "xclsBase64"
+Attribute VB_Name = "xBase64"
 Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = True
 Attribute VB_PredeclaredId = False
@@ -32,6 +32,7 @@ Private Const k_bytShift2 As Byte = 4
 Private Const k_bytShift4 As Byte = 16
 Private Const k_bytShift6 As Byte = 64
 Private Const k_lMaxBytesPerLine As Long = 152
+Private Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (ByVal Destination As Long, ByVal Source As Long, ByVal Length As Long)
 
 Public Function Decode64(sInput As String) As String
     If sInput = "" Then Exit Function

@@ -29,4 +29,5 @@ Public Enum Error
     PopAPOPisSupported = 20
     PopErrWhileQuitting = 21
     PopNoEmailsInAccount = 22
+    outofarray = 23
 End Enum

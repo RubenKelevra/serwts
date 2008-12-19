@@ -207,26 +207,26 @@ Private Function Maj(ByVal X As Long, ByVal Y As Long, ByVal z As Long) As Long
     Maj = ((X And Y) Xor (X And z) Xor (Y And z))
 End Function
 
-Private Function S(ByVal X As Long, ByVal n As Long) As Long
-    S = (RShift(X, (n And m_lOnBits(4))) Or LShift(X, (32 - (n And m_lOnBits(4)))))
+Private Function s(ByVal X As Long, ByVal n As Long) As Long
+    s = (RShift(X, (n And m_lOnBits(4))) Or LShift(X, (32 - (n And m_lOnBits(4)))))
 End Function
 Private Function R(ByVal X As Long, ByVal n As Long) As Long
     R = RShift(X, CInt(n And m_lOnBits(4)))
 End Function
 Private Function Sigma0(ByVal X As Long) As Long
-    Sigma0 = (S(X, 2) Xor S(X, 13) Xor S(X, 22))
+    Sigma0 = (s(X, 2) Xor s(X, 13) Xor s(X, 22))
 End Function
 
 Private Function Sigma1(ByVal X As Long) As Long
-    Sigma1 = (S(X, 6) Xor S(X, 11) Xor S(X, 25))
+    Sigma1 = (s(X, 6) Xor s(X, 11) Xor s(X, 25))
 End Function
 
 Private Function Gamma0(ByVal X As Long) As Long
-    Gamma0 = (S(X, 7) Xor S(X, 18) Xor R(X, 3))
+    Gamma0 = (s(X, 7) Xor s(X, 18) Xor R(X, 3))
 End Function
 
 Private Function Gamma1(ByVal X As Long) As Long
-    Gamma1 = (S(X, 17) Xor S(X, 19) Xor R(X, 10))
+    Gamma1 = (s(X, 17) Xor s(X, 19) Xor R(X, 10))
 End Function
 
 Private Function ConvertToWordArray(sMessage As String) As Long()
@@ -248,32 +248,32 @@ Private Function ConvertToWordArray(sMessage As String) As Long()
     lWordArray(lNumberOfWords - 2) = RShift(lMessageLength, 29)
     ConvertToWordArray = lWordArray
 End Function
-Public Function sum(sMessage As String) As String
-    Dim HASH(7) As Long, M() As Long, w(63) As Long, A As Long, B As Long
+Public Function SHA256(sMessage As String) As String
+    Dim HASH(7) As Long, m() As Long, w(63) As Long, a As Long, B As Long
     Dim C As Long, D As Long, E As Long, F As Long, G As Long, H As Long
-    Dim I As Long, J As Long, T1 As Long, T2 As Long
+    Dim i As Long, j As Long, T1 As Long, T2 As Long
     
     HASH(0) = &H6A09E667: HASH(1) = &HBB67AE85: HASH(2) = &H3C6EF372
     HASH(3) = &HA54FF53A: HASH(4) = &H510E527F: HASH(5) = &H9B05688C
     HASH(6) = &H1F83D9AB: HASH(7) = &H5BE0CD19
     
-    M = ConvertToWordArray(sMessage)
+    m = ConvertToWordArray(sMessage)
     
-    For I = 0 To UBound(M) Step 16
-        A = HASH(0): B = HASH(1): C = HASH(2): D = HASH(3)
+    For i = 0 To UBound(m) Step 16
+        a = HASH(0): B = HASH(1): C = HASH(2): D = HASH(3)
         E = HASH(4): F = HASH(5): G = HASH(6): H = HASH(7)
         
-        For J = 0 To 63
-            If J < 16 Then w(J) = M(J + I) Else w(J) = AddUnsigned(AddUnsigned(AddUnsigned(Gamma1(w(J - 2)), w(J - 7)), Gamma0(w(J - 15))), w(J - 16))
-            T1 = AddUnsigned(AddUnsigned(AddUnsigned(AddUnsigned(H, Sigma1(E)), Ch(E, F, G)), K(J)), w(J))
-            T2 = AddUnsigned(Sigma0(A), Maj(A, B, C))
+        For j = 0 To 63
+            If j < 16 Then w(j) = m(j + i) Else w(j) = AddUnsigned(AddUnsigned(AddUnsigned(Gamma1(w(j - 2)), w(j - 7)), Gamma0(w(j - 15))), w(j - 16))
+            T1 = AddUnsigned(AddUnsigned(AddUnsigned(AddUnsigned(H, Sigma1(E)), Ch(E, F, G)), K(j)), w(j))
+            T2 = AddUnsigned(Sigma0(a), Maj(a, B, C))
             H = G: G = F: F = E
             E = AddUnsigned(D, T1)
-            D = C: C = B: B = A
-            A = AddUnsigned(T1, T2)
+            D = C: C = B: B = a
+            a = AddUnsigned(T1, T2)
         Next
         
-        HASH(0) = AddUnsigned(A, HASH(0))
+        HASH(0) = AddUnsigned(a, HASH(0))
         HASH(1) = AddUnsigned(B, HASH(1))
         HASH(2) = AddUnsigned(C, HASH(2))
         HASH(3) = AddUnsigned(D, HASH(3))
@@ -282,6 +282,6 @@ Public Function sum(sMessage As String) As String
         HASH(6) = AddUnsigned(G, HASH(6))
         HASH(7) = AddUnsigned(H, HASH(7))
     Next
-    sum = LCase$(Right$("00000000" & Hex(HASH(0)), 8) & Right$("00000000" & Hex(HASH(1)), 8) & Right$("00000000" & Hex(HASH(2)), 8) & Right$("00000000" & Hex(HASH(3)), 8) & Right$("00000000" & Hex(HASH(4)), 8) & Right$("00000000" & Hex(HASH(5)), 8) & Right$("00000000" & Hex(HASH(6)), 8) & Right$("00000000" & Hex(HASH(7)), 8))
+    SHA256 = LCase$(Right$("00000000" & Hex(HASH(0)), 8) & Right$("00000000" & Hex(HASH(1)), 8) & Right$("00000000" & Hex(HASH(2)), 8) & Right$("00000000" & Hex(HASH(3)), 8) & Right$("00000000" & Hex(HASH(4)), 8) & Right$("00000000" & Hex(HASH(5)), 8) & Right$("00000000" & Hex(HASH(6)), 8) & Right$("00000000" & Hex(HASH(7)), 8))
     sMessage = ""
 End Function

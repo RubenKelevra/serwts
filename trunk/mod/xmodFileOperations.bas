@@ -5,11 +5,10 @@ Option Explicit
 Public Declare Sub Sleep Lib "kernel32" (ByVal lngMilliseconds As Long)
  
 'DLL call to create a path recursive, and check on low level if path exists
-Public Declare Function createDir _
- Lib "imagehlp.dll" (ByVal lpPath As String) As Long
- 
+Public Declare Function createDir Lib "imagehlp.dll" Alias "MakeSureDirectoryPathExists" (ByVal lpPath As String) As Long
+
 'DLL call to copy a part of memory which is specified to another location via pointer
-Public Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (ByVal Destination As Long, ByVal Source As Long, ByVal Length As Long)
+'Public Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (ByVal Destination As Long, ByVal Source As Long, ByVal Length As Long)
 
 'Author is "RobDog888" from www.vbforums.com
 

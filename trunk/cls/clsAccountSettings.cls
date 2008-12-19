@@ -23,6 +23,7 @@ Public mdtmLastFetch As Date
 Public mblnForceSecuredAuthorisation As Boolean
 'FIXME: this need get/set functions
 Private maMBoxes() As clsMBox
+Private mintInboxMbox As Integer
 Private i As Integer
 
 Public Function WskSetup(ByRef wsk As Winsock) As Boolean
@@ -90,6 +91,38 @@ Public Sub saveData(ByRef index As Integer, ByRef Data As String)
         Case Else
     End Select
 End Sub
+
+Public Function getInboxMbox() As Integer
+    getInboxMbox = mintInboxMbox
+End Function
+
+Public Function setInboxMbox(newIndex As Integer) As Integer
+    If newIndex >= LBound(maMBoxes) And newIndex <= UBound(maMBoxes) - LBound(maMBoxes) Then
+        mintInboxMbox = newIndex
+        setInboxMbox = Error.Success
+    Else
+        setInboxMbox = Error.outofarray
+    End If
+End Function
+
+Public Sub getUIDs(mboxindex As Integer, ByRef AllUIDs() As String)
+    Call maMBoxes(mboxindex).getUIDs(AllUIDs)
+End Sub
+
+Public Function changeMboxPath() As Integer
+    
+End Function
+
+Public Function getMboxMaxIndex() As Integer
+    getMboxCount = UBound(maMBoxes) - LBound(maMBoxes)
+End Function
+
+Public Function getMboxInfos(index As Integer) As String()
+    'selfno
+    'label
+    'parentno
+End Function
+
 
 Private Function AddSubbox(Parent As Integer, ByRef Selfname As String, selfno As Integer)
     
